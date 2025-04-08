@@ -20,3 +20,9 @@ private:
     const std::vector<bool>* finalized_;
     Compare cmp_;
 };
+
+template class TournamentTree<int>;
+template class TournamentTree<float>;
+template class TournamentTree<double>;
+template class TournamentTree<long>;
+template class TournamentTree<std::string>;

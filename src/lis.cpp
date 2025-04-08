@@ -1,4 +1,4 @@
-#include "include/lis.h"
+#include "include/problem.h"
 #include "include/tournament_tree.h"
 #include <algorithm>
 #include <omp.h>
@@ -19,6 +19,7 @@ int LIS<T, Compare>::compute(const std::vector<T>& data, Compare cmp) {
     int numFinalized = 0;
     // Used to record the cordon index of the current round
     int cordonIdx = -1;       
+    int maxResult = 0;
     // Use the Cordon algorithm to process states in rounds until all states are finalized
     while (numFinalized < n) {
         // Find the index of "the smallest element in the current prefix"
@@ -40,20 +41,14 @@ int LIS<T, Compare>::compute(const std::vector<T>& data, Compare cmp) {
         // Finalize the current state
         finalized[cordonIdx] = true;
         numFinalized++;
+        maxResult = std::max(maxResult, dp[cordonIdx]);
         
         tree.remove(cordonIdx);
         currentRound++;
     }
     
-    return *std::max_element(dp.begin(), dp.end());
+    return maxResult;
 }
-
-
-template class TournamentTree<int>;
-template class TournamentTree<float>;
-template class TournamentTree<double>;
-template class TournamentTree<long>;
-template class TournamentTree<std::string>;
 
 template class LIS<int>;
 template class LIS<float>;
