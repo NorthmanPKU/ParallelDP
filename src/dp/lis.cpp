@@ -1,5 +1,5 @@
-#include "include/problem.h"
-#include "include/tournament_tree.h"
+#include "problem.h"
+#include "tournament_tree.h"
 #include <algorithm>
 #include <omp.h>
 

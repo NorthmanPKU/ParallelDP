@@ -3,8 +3,9 @@
 #include <unordered_map>
 #include <omp.h>
 #include <string>
-#include "include/tournament_tree.h"
-#include "include/problem.h"
+// #include "include/tournament_tree.h"
+#include "problem.h"
+#include "segment_tree.h"
 
 template<typename T, typename Compare>
 int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& data2, Compare cmp) {
@@ -45,7 +46,9 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
             return a.second < b.second;
         return a.first > b.first;
     };
-    TournamentTree<std::pair<int,int>, decltype(effComp)> tree(effectiveStates, effComp);
+    // TournamentTree<std::pair<int,int>, decltype(effComp)> tree(effectiveStates, effComp);
+    auto max_pair = std::pair<int,int>(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
+    SegmentTree<std::pair<int,int>> tree(effectiveStates, max_pair);
     
     int currentRound = 1;
     int numFinalized = 0;
@@ -54,22 +57,27 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
 
     int prev_i = -1, prev_j = -1;
     while (numFinalized < l) {
+
         // cordonIdx = tree.query(cordonIdx + 1, l);
         /** Naive method for test */
-        int cordonIdx = -1;
-        int min_j = 1000000000; // 一个足够大的数
-        for (int i = 0; i < l; i++) {
-            if (!finalized[i] &&
-                effectiveStates[i].first > prev_i &&
-                effectiveStates[i].second > prev_j) {
-                if (effectiveStates[i].second < min_j) {
-                    cordonIdx = i;
-                    min_j = effectiveStates[i].second;
-                }
-            }
-        }
+        // int cordonIdx = -1;
+        // int min_j = 1000000000; // 一个足够大的数
+        // for (int i = 0; i < l; i++) {
+        //     if (!finalized[i] &&
+        //         effectiveStates[i].first > prev_i &&
+        //         effectiveStates[i].second > prev_j) {
+        //         if (effectiveStates[i].second < min_j) {
+        //             cordonIdx = i;
+        //             min_j = effectiveStates[i].second;
+        //         }
+        //     }
+        // }
 
-        if (cordonIdx == -1) break;
+        // if (cordonIdx == -1) break;
+        auto ret_pair = tree.query(cordonIdx + 1, l - 1);
+        cordonIdx = ret_pair.first;
+        if(cordonIdx == -1)
+            break;
         
         dp[cordonIdx] = currentRound;
         
@@ -88,6 +96,9 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
         finalized[cordonIdx] = true;
         numFinalized++;
         maxResult = std::max(maxResult, dp[cordonIdx]);
+        std::cout << "cordonIdx: " << cordonIdx << std::endl;
+        std::cout << "numFinalized: " << numFinalized << std::endl;
+        std::cout << "maxResult: " << maxResult << std::endl;
         
         // tree.remove(cordonIdx);
         currentRound++;
@@ -96,6 +107,7 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
         prev_i = effectiveStates[cordonIdx].first;
         prev_j = effectiveStates[cordonIdx].second;
     }
+    std::cout << "currentRound: " << currentRound << std::endl;
     
     return maxResult;
 }
