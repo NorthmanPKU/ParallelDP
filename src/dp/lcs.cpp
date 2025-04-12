@@ -49,6 +49,7 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
     // TournamentTree<std::pair<int,int>, decltype(effComp)> tree(effectiveStates, effComp);
     auto max_pair = std::pair<int,int>(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     SegmentTree<std::pair<int,int>> tree(effectiveStates, max_pair);
+    tree.print_tree();
     
     int currentRound = 1;
     int numFinalized = 0;
@@ -74,8 +75,9 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
         // }
 
         // if (cordonIdx == -1) break;
-        auto ret_pair = tree.query(cordonIdx + 1, l - 1);
-        cordonIdx = ret_pair.first;
+        // auto ret_pair = tree.query(cordonIdx + 1, l - 1);
+        // cordonIdx = ret_pair.first;
+        cordonIdx = tree.find_min_index();
         if(cordonIdx == -1)
             break;
         
@@ -100,7 +102,8 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
         std::cout << "numFinalized: " << numFinalized << std::endl;
         std::cout << "maxResult: " << maxResult << std::endl;
         
-        // tree.remove(cordonIdx);
+        tree.remove(cordonIdx);
+        // tree.print_tree();
         currentRound++;
 
         /** Naive method for test */
@@ -108,6 +111,32 @@ int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& 
         prev_j = effectiveStates[cordonIdx].second;
     }
     std::cout << "currentRound: " << currentRound << std::endl;
+
+    currentRound = 1;
+    numFinalized = 0;
+    cordonIdx = -1;
+    maxResult = 0;
+    prev_i = -1;
+    prev_j = -1;
+
+    // while (numFinalized < l) {
+
+        // cordonIdx = tree.query(cordonIdx + 1, l);
+        /** Naive method for test */
+    int min_j = 1000000000; // 一个足够大的数
+    for (int i = 0; i < l; i++) {
+        if (!finalized[i] &&
+            effectiveStates[i].first > prev_i &&
+            effectiveStates[i].second > prev_j) {
+            if (effectiveStates[i].second < min_j) {
+                cordonIdx = i;
+                min_j = effectiveStates[i].second;
+            }
+        }
+        std::cout << "cordonIdx: " << cordonIdx << std::endl;
+    } 
+    // }
+
     
     return maxResult;
 }

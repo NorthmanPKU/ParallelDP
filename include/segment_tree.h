@@ -136,6 +136,7 @@ private:
      */
     void update_recursive(size_t x, size_t l, size_t r, size_t pos, T new_val) {
         // If we've reached the leaf node
+        // std::cout << "update_recursive: x = " << x << ", l = " << l << ", r = " << r << ", pos = " << pos << ", new_val = " << new_val << std::endl;
         if (l == r) {
             tree[x] = new_val;
             return;
@@ -149,6 +150,9 @@ private:
         }
 
         tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
+        // std::cout << "update_recursive: tree[x] = " << tree[x] << std::endl;
+        // std::cout << "left_child: " << tree[lc(x)] << ", right_child: " << tree[rc(x)] << std::endl;
+
     }
 
     /**
@@ -262,9 +266,121 @@ public:
         if (arr.empty()) {
             throw std::invalid_argument("Input array cannot be empty");
         }
+        if constexpr (std::is_same_v<T, std::string>) {
+            //TODO: A current workaround for string comparison
+            infinity = "zzzzzzzzzzzzzzzzzzzz";
+        }
         tree.resize(4 * n, inf_value);
         build(arr, parallel, granularity);
     }
+
+    /**
+     * @brief Print the segment tree in a tree-like structure
+     * 
+     * @param max_depth Maximum depth to print (default: 5, to avoid excessive output for large trees)
+     * @param show_indices Whether to show node indices along with values (default: true)
+     */
+    void print_tree(int max_depth = 5, bool show_indices = true) const {
+        if (!constructed) {
+            std::cout << "Tree not constructed" << std::endl;
+            return;
+        }
+        
+        std::cout << "Segment Tree Visualization (n=" << n << ", max_depth=" << max_depth << "):" << std::endl;
+        print_subtree(0, 0, 0, n - 1, 0, max_depth, "  ", show_indices);
+    }
+
+    private:
+    /**
+     * @brief Recursively print a subtree with proper indentation
+     * 
+     * @param x Current node index
+     * @param depth Current depth in the tree
+     * @param l Left bound of current segment
+     * @param r Right bound of current segment
+     * @param current_depth Current depth in the recursion
+     * @param max_depth Maximum depth to print
+     * @param indent Current indentation string
+     * @param show_indices Whether to show node indices along with values
+     */
+    void print_subtree(size_t x, size_t depth, size_t l, size_t r, int current_depth, 
+                    int max_depth, const std::string& indent, bool show_indices) const {
+        // Print current node
+        std::cout << indent;
+        if (depth > 0) {
+            std::cout << "├─ ";
+        }
+        
+        // Show node value and optional info
+        if (show_indices) {
+            std::cout << "[" << x << "] ";
+        }
+        
+        if (tree[x] == infinity) {
+            std::cout << "∞";  // Use infinity symbol for infinity values
+        } else {
+            std::cout << tree[x];
+        }
+        
+        std::cout << " (" << l << ":" << r << ")";
+        
+        // Mark leaf nodes
+        if (l == r) {
+            std::cout << " [LEAF]";
+        }
+        std::cout << std::endl;
+        
+        // Stop if we've reached a leaf or maximum depth
+        if (l == r || current_depth >= max_depth) {
+            if (l != r && current_depth >= max_depth) {
+                std::cout << indent << "└─ ... (subtree omitted due to depth limit)" << std::endl;
+            }
+            return;
+        }
+        
+        // Calculate middle point
+        size_t mid = (l + r) / 2;
+        
+        // Print left child
+        print_subtree(lc(x), depth + 1, l, mid, current_depth + 1, max_depth, 
+                    indent + "│  ", show_indices);
+        
+        // Print right child
+        print_subtree(rc(x), depth + 1, mid + 1, r, current_depth + 1, max_depth, 
+                    indent + "   ", show_indices);
+    }
+
+    /**
+     * @brief Recursively find the index of the minimum value in a subtree
+     * 
+     * @param x Current node index in the segment tree
+     * @param l Left boundary of the current segment
+     * @param r Right boundary of the current segment
+     * @return The index of the minimum value in the original array
+     */
+    size_t find_min_index_recursive(size_t x, size_t l, size_t r) const {
+        // If we've reached a leaf node, return the corresponding array index
+        if (l == r) {
+            return l;
+        }
+        
+        size_t mid = (l + r) / 2;
+        
+        // Compare the minimum values in the left and right subtrees
+        T left_min = tree[lc(x)];
+        T right_min = tree[rc(x)];
+        // std::cout << "left_min: " << left_min << ", right_min: " << right_min << std::endl;
+        // If left subtree has the smaller value, go left
+        if (left_min <= right_min) {
+            return find_min_index_recursive(lc(x), l, mid);
+        }
+        // Otherwise, go right
+        else {
+            return find_min_index_recursive(rc(x), mid + 1, r);
+        }
+    }
+
+    public:
 
     /**
      * @brief Get the size of the segment tree
@@ -362,11 +478,25 @@ public:
         }
         
         if (l > r || r >= n) {
-            throw std::invalid_argument("Invalid query range: [" + std::to_string(l) + 
+            throw std::invalid_argument("Invalid query range in query: [" + std::to_string(l) + 
                                        ", " + std::to_string(r) + "]");
         }
         
         return query_recursive(0, 0, n - 1, l, r);
+    }
+
+    /**
+     * @brief Find the index of the global minimum value in the tree
+     * 
+     * @return The index of the minimum value in the original array
+     * @throws std::runtime_error if the tree has not been constructed
+     */
+    size_t find_min_index() const {
+        if (!constructed) {
+            throw std::runtime_error("Segment tree has not been constructed");
+        }
+
+        return find_min_index_recursive(0, 0, n - 1);
     }
 
     /**

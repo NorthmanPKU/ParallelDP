@@ -32,7 +32,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_library(problem_lib STATIC
     src/dp/lcs.cpp
-    # src/dp/lis.cpp
+    src/dp/lis.cpp
 )
 
 # Set properties for libraries
@@ -47,11 +47,14 @@ add_library(problem_lib STATIC
 
 # Create executables for LCS and LIS
 add_executable(lcs tests/dp_tests/lcs_test.cpp)
-# add_executable(lis src/dp/lis.cpp)
+add_executable(lis tests/dp_tests/lis_test.cpp)
+add_executable(lisjc tests/test_lis.cpp)
+# add_executable(lis tests/dp_tests/lis_test.cpp)
 
 # Link libraries to executables
 target_link_libraries(lcs OpenMP::OpenMP_CXX problem_lib)
-# target_link_libraries(lis OpenMP::OpenMP_CXX)
+target_link_libraries(lis OpenMP::OpenMP_CXX problem_lib)
+target_link_libraries(lisjc OpenMP::OpenMP_CXX problem_lib)
 
 # Main executable
 # add_executable(parallel_dp_test test.cpp)
