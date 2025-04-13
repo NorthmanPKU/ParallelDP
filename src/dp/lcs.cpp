@@ -7,6 +7,9 @@
 #include "problem.h"
 #include "segment_tree.h"
 
+
+// 废弃了，之后如果不需要参考了就可以删了
+
 template<typename T, typename Compare>
 int LCS<T, Compare>::compute(const std::vector<T>& data1, const std::vector<T>& data2, Compare cmp) {
     int n = data1.size(), m = data2.size();

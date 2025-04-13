@@ -49,12 +49,14 @@ add_library(problem_lib STATIC
 add_executable(lcs tests/dp_tests/lcs_test.cpp)
 add_executable(lis tests/dp_tests/lis_test.cpp)
 add_executable(lisjc tests/test_lis.cpp)
+add_executable(lcsjc tests/test_lcs.cpp)
 # add_executable(lis tests/dp_tests/lis_test.cpp)
 
 # Link libraries to executables
 target_link_libraries(lcs OpenMP::OpenMP_CXX problem_lib)
 target_link_libraries(lis OpenMP::OpenMP_CXX problem_lib)
 target_link_libraries(lisjc OpenMP::OpenMP_CXX problem_lib)
+target_link_libraries(lcsjc OpenMP::OpenMP_CXX problem_lib)
 
 # Main executable
 # add_executable(parallel_dp_test test.cpp)

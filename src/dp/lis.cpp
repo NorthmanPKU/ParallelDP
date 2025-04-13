@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <omp.h>
 
+// 废弃了，之后如果不需要参考了就可以删了
 
 template<typename T, typename Compare>
 int LIS<T, Compare>::compute(const std::vector<T>& data, Compare cmp) {

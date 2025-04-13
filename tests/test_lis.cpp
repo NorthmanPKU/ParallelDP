@@ -2,8 +2,7 @@
 #include <vector>
 #include <string>
 #include <random>
-// #include "../src/include/problem.h"
-#include "problem.h"
+#include "lis.h"
 
 
 void checkTest(const std::string &testName, int expected, int got) {
@@ -19,8 +18,8 @@ int refSol(std::vector<int>& nums) {
     if (nums.size() <= 1) return nums.size();
     std::vector<int> dp(nums.size(), 1);
     int result = 0;
-    for (int i = 1; i < nums.size(); i++) {
-        for (int j = 0; j < i; j++) {
+    for (size_t i = 1; i < nums.size(); i++) {
+        for (size_t j = 0; j < i; j++) {
             if (nums[i] > nums[j]) dp[i] = std::max(dp[i], dp[j] + 1);
         }
         if (dp[i] > result) result = dp[i];
@@ -47,7 +46,7 @@ int main() {
         int refResult = refSol(randomData);
         LIS<int> lis;
         int result = lis.compute(randomData);
-        checkTest("Random", refResult, result);
+        checkTest("Random Test", refResult, result);
     }
 
     // {

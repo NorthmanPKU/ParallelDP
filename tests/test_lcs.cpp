@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include "problem.h"
+#include "lcs.h"
 
 
 void checkTest(const std::string &testName, int expected, int got) {
@@ -13,37 +13,37 @@ void checkTest(const std::string &testName, int expected, int got) {
 }
 
 int main() {
-    // {
-    //     std::string s1 = "ABCBDAB";
-    //     std::string s2 = "BDCABA";
-    //     LCS<char> lcs;
-    //     int length = lcs.compute(s1, s2);
-    //     checkTest("Test 1", 4, length);
-    // }
+    {
+        std::string s1 = "ABCBDAB";
+        std::string s2 = "BDCABA";
+        LCS<char> lcs;
+        int length = lcs.compute(s1, s2);
+        checkTest("Test 1", 4, length);
+    }
 
-    // {
-    //     std::string s1 = "";
-    //     std::string s2 = "BDCABA";
-    //     LCS<char> lcs;
-    //     int length = lcs.compute(s1, s2);
-    //     checkTest("Test 2", 0, length);
-    // }
+    {
+        std::string s1 = "";
+        std::string s2 = "BDCABA";
+        LCS<char> lcs;
+        int length = lcs.compute(s1, s2);
+        checkTest("Test 2", 0, length);
+    }
 
-    // {
-    //     std::string s1 = "";
-    //     std::string s2 = "";
-    //     LCS<char> lcs;
-    //     int length = lcs.compute(s1, s2);
-    //     checkTest("Test 3", 0, length);
-    // }
+    {
+        std::string s1 = "";
+        std::string s2 = "";
+        LCS<char> lcs;
+        int length = lcs.compute(s1, s2);
+        checkTest("Test 3", 0, length);
+    }
 
-    // {
-    //     std::string s1 = "AGGTAB";
-    //     std::string s2 = "AGGTAB";
-    //     LCS<char> lcs;
-    //     int length = lcs.compute(s1, s2);
-    //     checkTest("Test 4", static_cast<int>(s1.size()), length);
-    // }
+    {
+        std::string s1 = "AGGTAB";
+        std::string s2 = "AGGTAB";
+        LCS<char> lcs;
+        int length = lcs.compute(s1, s2);
+        checkTest("Test 4", static_cast<int>(s1.size()), length);
+    }
 
     {
         std::vector<int> v1 = {1, 3, 4, 1, 2, 3};

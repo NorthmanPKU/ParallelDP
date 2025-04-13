@@ -1,45 +1,53 @@
-#pragma once
-
-#include <vector>
-#include <functional>
-#include <limits>
-#include <string>
-
-#include "utils.h"
-
-// 废弃了，之后如果不需要参考了就可以删了
-
-
-// Use the Cordon algorithm to solve the Longest Increasing Subsequence (LIS) problem, 
-// supporting any data type T and user-defined comparison functions.
-template<typename T, typename Compare = std::less<T>>
-class LIS {
-public:
-    // The parameter cmp is a comparison function, defaulting to std::less<T>
-    int compute(const std::vector<T>& data, Compare cmp = Compare());
-};
-
-
-// Use the Cordon algorithm to solve the Longest Common Subsequence (LCS) problem, 
-// supporting any data type T and user-defined comparison functions.
-template<typename T, typename Compare = std::less<T>>
-class LCS {
-public:
-    // The parameter cmp is a comparison function, defaulting to std::less<T>
-    int compute(const std::vector<T>& data1, const std::vector<T>& data2, Compare cmp = Compare());
-
-    int compute(const std::string& data1, const std::string& data2, Compare cmp = Compare()) {
-        return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), cmp);
-    }
-};
-
-
 template<typename T, typename Compare = std::less<T>>
 class ConvexGLWS {
 public:
     T compute(const std::vector<T>& data,
               std::function<T(int, int)> costFunc,
-              Compare cmp);
+              Compare cmp) {
+                int n = data.size();
+        if (n == 0) return T();
+
+        std::vector<T> dp(n, std::numeric_limits<T>::max());
+        dp[0] = 0;
+
+        std::vector<bool> finalized(n, false);
+        finalized[0] = true;
+        int numFinalized = 1;
+
+        TournamentTree<T, Compare> tree(dp, cmp);
+        tree.remove(0);
+
+        // Compress the optimal decision array. Initially, for states 1 to n-1, the default optimal decision is 0
+        std::vector<Interval> optimal_decisions;
+        if (n > 1) optimal_decisions.push_back({1, n - 1, 0});
+
+        int now = 0;
+        while (now < n - 1) {
+            int cordon = tree.query(now + 1, n);
+            if (cordon == -1) break;
+            
+            finalized[cordon] = true;
+            #pragma omp parallel for schedule(dynamic)
+            for (int i = cordon + 1; i < n; i++) {
+                if (!finalized[i]) {
+                    T newCost = dp[cordon] + costFunc(cordon, i);
+                    if (cmp(newCost, dp[i])) {
+                        #pragma omp critical
+                        {
+                            dp[i] = std::min(dp[i], newCost);
+                        }
+                    }
+                }
+            }
+            
+            tree.remove(cordon);
+            
+            UpdateBest(now, cordon, n, dp, optimal_decisions, costFunc, cmp);
+            now = cordon;
+        }
+
+        return dp[n - 1];
+    }
 
 private:
     // FindIntervals: In the state interval [il, ir], find the best decision index 
