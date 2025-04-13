@@ -73,3 +73,23 @@ target_link_libraries(lcsjc OpenMP::OpenMP_CXX problem_lib)
 # add_executable(segment_tree_test tests/tree_tests/segment_tree.cpp)
 # target_link_libraries(segment_tree_test tree_lib)
 # add_test(NAME SegmentTreeTest COMMAND segment_tree_test)
+
+
+
+find_program(CLANG_FORMAT "clang-format")
+
+if (CLANG_FORMAT)
+    file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
+        "${CMAKE_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_SOURCE_DIR}/include/*.h"
+    )
+
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT}
+        -i
+        -style=file
+        ${ALL_CXX_SOURCE_FILES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Running clang-format on source files"
+    )
+endif()
