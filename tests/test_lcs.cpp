@@ -13,11 +13,12 @@ void checkTest(const std::string &testName, int expected, int got) {
 }
 
 int main() {
+    bool parallel = true;
     {
         std::string s1 = "ABCBDAB";
         std::string s2 = "BDCABA";
         LCS<char> lcs;
-        int length = lcs.compute(s1, s2);
+        int length = lcs.compute(s1, s2, parallel);
         checkTest("Test 1", 4, length);
     }
 
@@ -25,7 +26,7 @@ int main() {
         std::string s1 = "";
         std::string s2 = "BDCABA";
         LCS<char> lcs;
-        int length = lcs.compute(s1, s2);
+        int length = lcs.compute(s1, s2, parallel);
         checkTest("Test 2", 0, length);
     }
 
@@ -33,7 +34,7 @@ int main() {
         std::string s1 = "";
         std::string s2 = "";
         LCS<char> lcs;
-        int length = lcs.compute(s1, s2);
+        int length = lcs.compute(s1, s2, parallel);
         checkTest("Test 3", 0, length);
     }
 
@@ -41,7 +42,7 @@ int main() {
         std::string s1 = "AGGTAB";
         std::string s2 = "AGGTAB";
         LCS<char> lcs;
-        int length = lcs.compute(s1, s2);
+        int length = lcs.compute(s1, s2, parallel);
         checkTest("Test 4", static_cast<int>(s1.size()), length);
     }
 
@@ -49,7 +50,7 @@ int main() {
         std::vector<int> v1 = {1, 3, 4, 1, 2, 3};
         std::vector<int> v2 = {3, 4, 1, 2, 1, 3};
         LCS<int> lcs;
-        int length = lcs.compute(v1, v2);
+        int length = lcs.compute(v1, v2, parallel);
         checkTest("Test 5", 5, length);
     }
 

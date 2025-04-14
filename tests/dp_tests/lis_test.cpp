@@ -2,7 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include "problem.h"
+#include "lis.h"
 
 int main(int argc, char* argv[]) {
     // std::vector<int> seq1 = {1, 2, 3, 4, 5};

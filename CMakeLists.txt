@@ -30,10 +30,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 #     # Add other tree implementations if needed
 # )
 
-add_library(problem_lib STATIC
-    src/dp/lcs.cpp
-    src/dp/lis.cpp
-)
+# add_library(problem_lib STATIC)
 
 # Set properties for libraries
 # set_target_properties(tree_lib PROPERTIES
@@ -53,10 +50,10 @@ add_executable(lcsjc tests/test_lcs.cpp)
 # add_executable(lis tests/dp_tests/lis_test.cpp)
 
 # Link libraries to executables
-target_link_libraries(lcs OpenMP::OpenMP_CXX problem_lib)
-target_link_libraries(lis OpenMP::OpenMP_CXX problem_lib)
-target_link_libraries(lisjc OpenMP::OpenMP_CXX problem_lib)
-target_link_libraries(lcsjc OpenMP::OpenMP_CXX problem_lib)
+# target_link_libraries(lcs OpenMP::OpenMP_CXX problem_lib)
+# target_link_libraries(lis OpenMP::OpenMP_CXX problem_lib)
+# target_link_libraries(lisjc OpenMP::OpenMP_CXX problem_lib)
+# target_link_libraries(lcsjc OpenMP::OpenMP_CXX problem_lib)
 
 # Main executable
 # add_executable(parallel_dp_test test.cpp)

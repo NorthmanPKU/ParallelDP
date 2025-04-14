@@ -12,7 +12,7 @@ class LCS {
   /**
    * @brief Conver lcs to lis to compute
    */
-  int compute(const std::vector<T> &data1, const std::vector<T> &data2) {
+  int compute_as_lis(const std::vector<T> &data1, const std::vector<T> &data2) {
     int n = data1.size(), m = data2.size();
     if (n == 0 || m == 0) return 0;
 
@@ -48,7 +48,48 @@ class LCS {
     return lis.compute(effectiveStates, effComp, max_pair);
   }
 
-  int compute(const std::string &data1, const std::string &data2) {
-    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()));
+  int compute_as_lis(const std::string &data1, const std::string &data2) {
+    return compute_as_lis(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()));
+  }
+
+  int compute(const std::vector<T> &data1, const std::vector<T> &data2, bool parallel=false, int granularity=0) {
+    int n = data1.size(), m = data2.size();
+    if (n == 0 || m == 0) return 0;
+
+    std::vector<std::vector<int>> arrows(n, std::vector<int>(0));
+    std::unordered_map<T, std::vector<int>> data2_to_indices;
+    for (int j = 0; j < m; j++) {
+      data2_to_indices[data2[j]].push_back(j);
+    }
+
+    // Get the effective states: (i, j) pairs where data1[i] == data2[j]
+    for (int i = 0; i < n; i++) {
+      auto it = data2_to_indices.find(data1[i]);
+      if (it != data2_to_indices.end()) {
+        for (int j : it->second) {
+          arrows[i].push_back(j);
+        }
+      }
+    }
+    std::cout << "arrows: " << std::endl;
+    for (int i = 0; i < n; i++) {
+      std::cout << "arrows[" << i << "]: ";
+      for (int j : arrows[i]) {
+        std::cout << j << " ";
+      }
+      std::cout << std::endl;
+    }
+
+    SegmentTree<int> tree(arrows, std::numeric_limits<int>::max(), parallel, granularity);
+    int round = 0;
+    while (tree.global_min() < std::numeric_limits<int>::max()) {
+      round++;
+      tree.prefix_min();
+    }
+    return round;
+  }
+
+  int compute(const std::string &data1, const std::string &data2, bool parallel=false, int granularity=0) {
+    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), parallel, granularity);
   }
 };

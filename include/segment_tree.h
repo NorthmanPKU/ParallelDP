@@ -34,6 +34,13 @@ class SegmentTree {
   T infinity;                // Value representing infinity
   bool constructed = false;  // Flag to track if tree has been constructed
 
+  // For LCS prefix minimum operation
+  bool prefix_mode = false;
+  std::vector<size_t> now;
+  std::vector<std::vector<T>> arrows;
+  int granularity = 1000;
+  bool parallel = false;
+
   /**
    * @brief Get the index of the left child of a node
    * @param x The index of the parent node
@@ -65,7 +72,7 @@ class SegmentTree {
    * @param parallel Whether to build the tree in parallel
    * @param granularity The minimum size of a subtree to process in parallel
    */
-  void build_recursive(const std::vector<T> &arr, size_t x, size_t l, size_t r, bool parallel, size_t granularity) {
+  void build_recursive(const std::vector<T> &arr, size_t x, size_t l, size_t r) {
     if (l == r) {
       tree[x] = (l < arr.size()) ? arr[l] : infinity;
       return;
@@ -76,13 +83,13 @@ class SegmentTree {
 
     if (do_parallel) {
 #pragma omp task shared(arr, tree)
-      { build_recursive(arr, lc(x), l, mid, parallel, granularity); }
+      { build_recursive(arr, lc(x), l, mid); }
 #pragma omp task shared(arr, tree)
-      { build_recursive(arr, rc(x), mid + 1, r, parallel, granularity); }
+      { build_recursive(arr, rc(x), mid + 1, r); }
 #pragma omp taskwait
     } else {
-      build_recursive(arr, lc(x), l, mid, parallel, granularity);
-      build_recursive(arr, rc(x), mid + 1, r, parallel, granularity);
+      build_recursive(arr, lc(x), l, mid);
+      build_recursive(arr, rc(x), mid + 1, r);
     }
 
     tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
@@ -158,8 +165,7 @@ class SegmentTree {
    * @param parallel Whether to perform the operation in parallel
    * @param granularity The minimum size of a subtree to process in parallel
    */
-  void prefix_min_recursive(size_t x, size_t l, size_t r, T pre, const std::vector<std::vector<T>> &arrows,
-                            std::vector<size_t> &now, bool parallel, size_t granularity) {
+  void prefix_min_recursive(size_t x, size_t l, size_t r, T pre) {
     // Early return if this node's value is already greater than pre
     if (tree[x] > pre) {
       return;
@@ -181,7 +187,7 @@ class SegmentTree {
       }
 
       // Update the tree value after the index change
-      tree[x] = (now[l] >= ys.size()) ? infinity : ys[now[l]];
+      tree[x] = read(l);
       return;
     }
 
@@ -194,20 +200,20 @@ class SegmentTree {
         T lc_val = tree[lc(x)];
 
         if (do_parallel) {
-#pragma omp task shared(tree, arrows, now)
-          { prefix_min_recursive(lc(x), l, mid, pre, arrows, now, parallel, granularity); }
-#pragma omp task shared(tree, arrows, now)
-          { prefix_min_recursive(rc(x), mid + 1, r, lc_val, arrows, now, parallel, granularity); }
+#pragma omp task shared(tree)
+          { prefix_min_recursive(lc(x), l, mid, pre); }
+#pragma omp task shared(tree)
+          { prefix_min_recursive(rc(x), mid + 1, r, lc_val); }
 #pragma omp taskwait
         } else {
-          prefix_min_recursive(lc(x), l, mid, pre, arrows, now, parallel, granularity);
-          prefix_min_recursive(rc(x), mid + 1, r, lc_val, arrows, now, parallel, granularity);
+          prefix_min_recursive(lc(x), l, mid, pre);
+          prefix_min_recursive(rc(x), mid + 1, r, lc_val);
         }
       } else {
-        prefix_min_recursive(rc(x), mid + 1, r, pre, arrows, now, parallel, granularity);
+        prefix_min_recursive(rc(x), mid + 1, r, pre);
       }
     } else {
-      prefix_min_recursive(lc(x), l, mid, pre, arrows, now, parallel, granularity);
+      prefix_min_recursive(lc(x), l, mid, pre);
     }
 
     // Update this node's value
@@ -215,22 +221,8 @@ class SegmentTree {
   }
 
  public:
-  /**
-   * @brief Construct a new Segment Tree object
-   *
-   * @param size The number of elements in the original array
-   * @param inf_value The value to use as infinity (default: maximum value of type T)
-   */
-  SegmentTree(size_t size, T inf_value = std::numeric_limits<T>::max()) : n(size), infinity(inf_value) {
-    if (size == 0) {
-      throw std::invalid_argument("Segment tree size cannot be zero");
-    }
 
-    // Allocate memory for the segment tree (4 * n is sufficient)
-    tree.resize(4 * n, infinity);
-  }
-
-  /**
+/**
    * @brief Construct a new Segment Tree object based on an array
    *
    * @param arr The input array to build the tree from
@@ -238,7 +230,7 @@ class SegmentTree {
    */
   SegmentTree(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
               size_t granularity = 1000)
-      : n(arr.size()), infinity(inf_value) {
+      : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
     std::cout << "SegmentTree init" << std::endl;
     std::cout << "arr: " << std::endl;
     for (size_t i = 0; i < arr.size(); ++i) {
@@ -256,7 +248,35 @@ class SegmentTree {
       infinity = "zzzzzzzzzzzzzzzzzzzz";
     }
     tree.resize(4 * n, inf_value);
-    build(arr, parallel, granularity);
+    build(arr);
+  }
+
+  /**
+   * @brief Construct a new Segment Tree for LCS prefix minimum operation
+   *
+   * @param _arrows The input array of arrow sequences
+   * @param inf_value The value to use as infinity (default: maximum value of type T)
+   * @param parallel Whether to build the tree in parallel
+   * @param granularity The minimum size of a subtree to process in parallel
+   */
+  SegmentTree(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
+              size_t _granularity = 1000)
+      : n(_arrows.size()), infinity(inf_value), arrows(_arrows), prefix_mode(true), granularity(_granularity), parallel(_parallel) {
+    std::cout << "SegmentTree Prefix mode init" << std::endl;
+    std::cout << "inf_value: " << inf_value << std::endl;
+    std::cout << "parallel: " << parallel << std::endl;
+    std::cout << "granularity: " << granularity << std::endl;
+    if constexpr (std::is_same_v<T, std::string>) {
+      // TODO: A current workaround for string comparison
+      infinity = "zzzzzzzzzzzzzzzzzzzz";
+    }
+    tree.resize(4 * n, inf_value);
+    now.resize(n, 0);
+    std::vector<T> arr(n);
+    for (size_t i = 0; i < n; ++i) {
+      arr[i] = read(i);
+    }
+    build(arr);
   }
 
   /**
@@ -386,6 +406,13 @@ class SegmentTree {
   }
 
   /**
+   * Return the current global minimum value in the tree
+   */
+  T global_min() const {
+    return tree[0];
+  }
+
+  /**
    * @brief Get the raw tree array
    *
    * @return A const reference to the tree array
@@ -400,7 +427,7 @@ class SegmentTree {
    * @param granularity The minimum size of a subtree to process in parallel
    * @throws std::invalid_argument if the array is empty
    */
-  void build(const std::vector<T> &arr, bool parallel = false, size_t granularity = 1000) {
+  void build(const std::vector<T> &arr) {
     if (arr.empty()) {
       throw std::invalid_argument("Input array cannot be empty");
     }
@@ -413,29 +440,13 @@ class SegmentTree {
 #pragma omp parallel
       {
 #pragma omp single nowait
-        { build_recursive(arr, 0, 0, n - 1, true, granularity); }
+        { build_recursive(arr, 0, 0, n - 1); }
       }
     } else {
-      build_recursive(arr, 0, 0, n - 1, false, granularity);
+      build_recursive(arr, 0, 0, n - 1);
     }
 
     constructed = true;
-  }
-
-  /**
-   * @brief Build the segment tree using a read function
-   *
-   * @param read_func A function that returns the value at position i
-   * @param parallel Whether to build the tree in parallel
-   * @param granularity The minimum size of a subtree to process in parallel
-   */
-  void build_with_function(const std::function<T(size_t)> &read_func, bool parallel = false,
-                           size_t granularity = 1000) {
-    std::vector<T> arr(n);
-    for (size_t i = 0; i < n; ++i) {
-      arr[i] = read_func(i);
-    }
-    build(arr, parallel, granularity);
   }
 
   /**
@@ -495,7 +506,7 @@ class SegmentTree {
   }
 
   /**
-   * @brief Perform the prefix minimum operation as specified in the provided code
+   * @brief Perform the prefix minimum operation
    *
    * Updates the segment tree based on prefix minimum values from arrow sequences.
    *
@@ -507,8 +518,11 @@ class SegmentTree {
    * @throws std::invalid_argument if the arrow sequences or now indices are invalid
    * @throws std::runtime_error if the tree has not been constructed
    */
-  void prefix_min(T pre, const std::vector<std::vector<T>> &arrows, std::vector<size_t> &now, bool parallel = false,
-                  size_t granularity = 1000) {
+  void prefix_min() {
+    if (!prefix_mode) {
+      throw std::runtime_error("This is not Prefix mode");
+    }
+
     if (!constructed) {
       throw std::runtime_error("Segment tree has not been constructed");
     }
@@ -532,49 +546,29 @@ class SegmentTree {
 #pragma omp parallel
       {
 #pragma omp single nowait
-        { prefix_min_recursive(0, 0, n - 1, pre, arrows, now, true, granularity); }
+        { prefix_min_recursive(0, 0, n - 1, infinity); }
       }
     } else {
-      prefix_min_recursive(0, 0, n - 1, pre, arrows, now, false, granularity);
+      prefix_min_recursive(0, 0, n - 1, infinity);
     }
   }
 
   /**
-   * @brief Function to simulate the Read lambda function from the provided code
+   * @brief Function to simulate the Read lambda function for LCS prefix minimum operation
    *
    * @param i Index to read from
    * @param arrows The array of arrow sequences
    * @param now The current indices in the arrow sequences
    * @return The value at position i in arrows[i], or infinity if out of bounds
    */
-  static T read(size_t i, const std::vector<std::vector<T>> &arrows, const std::vector<size_t> &now) {
+  T read(size_t i) {
+    if (!prefix_mode) {
+        throw std::runtime_error("This is not Prefix mode");
+    }
     if (now[i] >= arrows[i].size()) {
       return std::numeric_limits<T>::max();  // Return infinity
     }
     return arrows[i][now[i]];
-  }
-
-  /**
-   * @brief Helper function to determine whether to execute in parallel
-   *
-   * @param parallel Whether parallelism is enabled
-   * @param task1 First task to execute
-   * @param task2 Second task to execute
-   */
-  static void conditional_par_do(bool parallel, const std::function<void()> &task1,
-                                 const std::function<void()> &task2) {
-    if (parallel) {
-#pragma omp parallel sections
-      {
-#pragma omp section
-        { task1(); }
-#pragma omp section
-        { task2(); }
-      }
-    } else {
-      task1();
-      task2();
-    }
   }
 
   /**

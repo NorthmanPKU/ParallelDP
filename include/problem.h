@@ -24,11 +24,13 @@ template <typename T, typename Compare = std::less<T>>
 class LCS {
  public:
   // The parameter cmp is a comparison function, defaulting to std::less<T>
-  int compute(const std::vector<T> &data1, const std::vector<T> &data2, Compare cmp = Compare());
+  int compute(const std::vector<T> &data1, const std::vector<T> &data2, Compare cmp = Compare(), bool parallel = false);
 
-  int compute(const std::string &data1, const std::string &data2, Compare cmp = Compare()) {
-    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), cmp);
-  }
+  int compute(const std::string &data1, const std::string &data2, Compare cmp = Compare(), bool parallel = false);
+
+  int compute_as_lis(const std::vector<T> &data1, const std::vector<T> &data2, Compare cmp = Compare());
+
+  int compute_as_lis(const std::string &data1, const std::string &data2, Compare cmp = Compare());
 };
 
 template <typename T, typename Compare = std::less<T>>

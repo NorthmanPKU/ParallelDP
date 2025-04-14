@@ -49,7 +49,7 @@ int LCS<T, Compare>::compute(const std::vector<T> &data1, const std::vector<T> &
   };
   // TournamentTree<std::pair<int,int>, decltype(effComp)> tree(effectiveStates, effComp);
   auto max_pair = std::pair<int, int>(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
-  SegmentTree<std::pair<int, int>> tree(effectiveStates, max_pair);
+  SegmentTree<std::pair<int, int>> tree(effectiveStates, max_pair, parallel, 0);
   tree.print_tree();
 
   int currentRound = 1;
@@ -73,7 +73,6 @@ int LCS<T, Compare>::compute(const std::vector<T> &data1, const std::vector<T> &
     //         }
     //     }
     // }
-
     // if (cordonIdx == -1) break;
     // auto ret_pair = tree.query(cordonIdx + 1, l - 1);
     // cordonIdx = ret_pair.first;
