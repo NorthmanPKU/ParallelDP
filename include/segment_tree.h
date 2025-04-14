@@ -232,10 +232,10 @@ class SegmentTree {
               size_t granularity = 1000)
       : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
     std::cout << "SegmentTree init" << std::endl;
-    std::cout << "arr: " << std::endl;
-    for (size_t i = 0; i < arr.size(); ++i) {
-      std::cout << arr[i] << " ";
-    }
+    // std::cout << "arr: " << std::endl;
+    // for (size_t i = 0; i < arr.size(); ++i) {
+    //   std::cout << arr[i] << " ";
+    // }
     std::cout << std::endl;
     std::cout << "inf_value: " << inf_value << std::endl;
     std::cout << "parallel: " << parallel << std::endl;
@@ -353,35 +353,35 @@ class SegmentTree {
     print_subtree(rc(x), depth + 1, mid + 1, r, current_depth + 1, max_depth, indent + "   ", show_indices);
   }
 
-  /**
-   * @brief Recursively find the index of the minimum value in a subtree
-   *
-   * @param x Current node index in the segment tree
-   * @param l Left boundary of the current segment
-   * @param r Right boundary of the current segment
-   * @return The index of the minimum value in the original array
-   */
-  size_t find_min_index_recursive(size_t x, size_t l, size_t r) const {
-    // If we've reached a leaf node, return the corresponding array index
-    if (l == r) {
-      return l;
-    }
+//   /**
+//    * @brief Recursively find the index of the minimum value in a subtree
+//    *
+//    * @param x Current node index in the segment tree
+//    * @param l Left boundary of the current segment
+//    * @param r Right boundary of the current segment
+//    * @return The index of the minimum value in the original array
+//    */
+//   size_t find_min_index_recursive(size_t x, size_t l, size_t r) const {
+//     // If we've reached a leaf node, return the corresponding array index
+//     if (l == r) {
+//       return l;
+//     }
 
-    size_t mid = (l + r) / 2;
+//     size_t mid = (l + r) / 2;
 
-    // Compare the minimum values in the left and right subtrees
-    T left_min = tree[lc(x)];
-    T right_min = tree[rc(x)];
-    // std::cout << "left_min: " << left_min << ", right_min: " << right_min << std::endl;
-    // If left subtree has the smaller value, go left
-    if (left_min <= right_min) {
-      return find_min_index_recursive(lc(x), l, mid);
-    }
-    // Otherwise, go right
-    else {
-      return find_min_index_recursive(rc(x), mid + 1, r);
-    }
-  }
+//     // Compare the minimum values in the left and right subtrees
+//     T left_min = tree[lc(x)];
+//     T right_min = tree[rc(x)];
+//     // std::cout << "left_min: " << left_min << ", right_min: " << right_min << std::endl;
+//     // If left subtree has the smaller value, go left
+//     if (left_min <= right_min) {
+//       return find_min_index_recursive(lc(x), l, mid);
+//     }
+//     // Otherwise, go right
+//     else {
+//       return find_min_index_recursive(rc(x), mid + 1, r);
+//     }
+//   }
 
  public:
   /**
@@ -482,7 +482,27 @@ class SegmentTree {
       throw std::runtime_error("Segment tree has not been constructed");
     }
 
-    return find_min_index_recursive(0, 0, n - 1);
+    // return find_min_index_recursive(0, 0, n - 1);
+    size_t node_idx = 0;
+    size_t left = 0;
+    size_t right = n - 1;
+    
+    while (left < right) {
+        size_t mid = (left + right) / 2;
+        
+        T left_min = tree[lc(node_idx)];
+        T right_min = tree[rc(node_idx)];
+        
+        if (left_min <= right_min) {
+            node_idx = lc(node_idx);
+            right = mid;
+        } else {
+            node_idx = rc(node_idx);
+            left = mid + 1;
+        }
+    }
+    
+    return left;
   }
 
   /**

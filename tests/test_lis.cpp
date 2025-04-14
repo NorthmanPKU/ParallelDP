@@ -3,7 +3,8 @@
 #include <string>
 #include <random>
 #include "lis.h"
-
+#include "utils.h"
+#include <chrono>
 
 void checkTest(const std::string &testName, int expected, int got) {
     if (expected != got) {
@@ -41,13 +42,13 @@ std::vector<int> generateRandomInputData(int n, int lowerBound = 0, int upperBou
 }
 
 int main() {
-    {
-        std::vector<int> randomData = generateRandomInputData(1000, 1, 10000);
-        int refResult = refSol(randomData);
-        LIS<int> lis;
-        int result = lis.compute(randomData);
-        checkTest("Random Test", refResult, result);
-    }
+    // {
+    //     std::vector<int> randomData = generateRandomInputData(1000, 1, 10000);
+    //     int refResult = refSol(randomData);
+    //     LIS<int> lis;
+    //     int result = lis.compute(randomData);
+    //     checkTest("Random Test", refResult, result);
+    // }
 
     // {
     //     std::vector<int> data = {10, 22, 9, 33, 21, 50, 41, 60, 80};
@@ -91,6 +92,32 @@ int main() {
     //     int length = lis.compute(ascending, std::greater<int>());
     //     checkTest("Test 6", 1, length);
     // }
+    {
+        std::vector<int> input = generateLIS(100000, 10);
+        LIS<int> lis;
+        bool parallel = true;
+        int granularity = 1000;
+        // time the execution of the function
+        auto start = std::chrono::high_resolution_clock::now();
+        int length = lis.compute(input, parallel, granularity);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::cout << "Time taken in parallel: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+        // checkTest("Performance Test", refLength, length);
+
+        auto start2 = std::chrono::high_resolution_clock::now();
+        int length2 = lis.compute(input, false);
+        auto end2 = std::chrono::high_resolution_clock::now();
+        std::cout << "Time taken in serial: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2).count() << "ms" << std::endl;
+        // checkTest("Performance Test", refLength, length);
+
+        auto start3 = std::chrono::high_resolution_clock::now();
+        int refLength = refSol(input);
+        auto end3 = std::chrono::high_resolution_clock::now();
+        std::cout << "Time taken in naive: " << std::chrono::duration_cast<std::chrono::milliseconds>(end3 - start3).count() << "ms" << std::endl;
+
+        checkTest("Performance Test", refLength, length);
+        checkTest("Performance Test", refLength, length2);
+    }
 
     std::cout << "Test Finished." << std::endl;
     return 0;
