@@ -22,7 +22,82 @@ inline int getBest(int j, const std::vector<Interval> &arr) {
   return 0;
 }
 
-std::pair<std::vector<int>, std::vector<int>> generateLCS(int length1, int length2, int lcsLength) {
+
+void get_existing_arrows(int n, int m, int lcs_length, std::vector<std::vector<int>> &arrows) {
+    std::string filename = "arrow_" + std::to_string(n) + "_" + std::to_string(m) + "_" + std::to_string(lcs_length) + ".txt";
+    std::ifstream file(filename);
+    if (file.is_open()) {
+        // 清空并预分配空间
+        arrows.clear();
+        arrows.resize(n);
+        
+        // 逐行读取
+        std::string line;
+        int i = 0;
+        while (std::getline(file, line) && i < n) {
+            std::istringstream iss(line);
+            int value;
+            // 读取该行的所有整数
+            while (iss >> value) {
+                arrows[i].push_back(value);
+            }
+            i++;
+        }
+        std::cout << "Arrows read from " << filename << std::endl;
+        return;
+    }
+    std::cout << "Arrows not found in " << filename << std::endl;
+}
+
+template <typename T>
+void get_arrows(const std::vector<T> &data1, const std::vector<T> &data2, int lcs_length, std::vector<std::vector<int>> &arrows) {
+    int n = data1.size();
+    int m = data2.size();
+
+    // check if arrow_n_m_lcslen.txt exists
+    std::string filename = "arrow_" + std::to_string(n) + "_" + std::to_string(m) + "_" + std::to_string(lcs_length) + ".txt";
+    std::ifstream file(filename);
+    // if exists, read from file
+    if (file.is_open()) {
+        //read into arrows
+        get_existing_arrows(n, m, lcs_length, arrows);
+        return;
+    }
+
+    arrows = std::vector<std::vector<int>>(n, std::vector<int>(0));
+
+    std::unordered_map<T, std::vector<int>> data2_to_indices;
+    for (int j = 0; j < m; j++) {
+        data2_to_indices[data2[j]].push_back(j);
+    }
+
+    // Get the effective states: (i, j) pairs where data1[i] == data2[j]
+    for (int i = 0; i < n; i++) {
+        auto it = data2_to_indices.find(data1[i]);
+        if (it != data2_to_indices.end()) {
+            for (int j : it->second) {
+                arrows[i].push_back(j);
+            }
+        }
+    }
+
+    // save to file
+    std::ofstream outFile(filename);
+    if (outFile.is_open()) {
+        for (int i = 0; i < n; i++) {
+            for (int j : arrows[i]) {
+                outFile << j << " ";
+            }
+            outFile << "\n";
+        }
+        outFile.close();
+        std::cout << "Arrows saved to " << filename << std::endl;
+    }
+}
+
+
+void generateLCS(int length1, int length2, int lcsLength, 
+                std::vector<std::vector<int>> &arrows) {
     // 参数验证
     if (lcsLength > std::min(length1, length2)) {
         std::cerr << "Error: LCS length cannot be greater than the minimum of the two array lengths" << std::endl;
@@ -30,32 +105,41 @@ std::pair<std::vector<int>, std::vector<int>> generateLCS(int length1, int lengt
     }
 
     // Find if data file exists
-    std::string filename = "lcs_data_" + std::to_string(length1) + "_" + std::to_string(length2) + "_" + std::to_string(lcsLength) + ".txt";
-    std::ifstream file(filename);
-    // 使用占位符值初始化序列
+
+    std::string arrow_filename = "arrow_" + std::to_string(length1) + "_" + std::to_string(length2) + "_" + std::to_string(lcsLength) + ".txt";
+    std::ifstream arrow_file(arrow_filename);
+    if (arrow_file.is_open()) {
+        std::cout << "Arrows read from " << arrow_filename << std::endl;
+        get_existing_arrows(length1, length2, lcsLength, arrows);
+        return;
+    }
+
+    // std::string filename = "lcs_data_" + std::to_string(length1) + "_" + std::to_string(length2) + "_" + std::to_string(lcsLength) + ".txt";
+    // std::ifstream file(filename);
+    // // 使用占位符值初始化序列
     std::vector<int> seq1(length1, -1);
     std::vector<int> seq2(length2, -1);
-    if (file.is_open()) {
-        std::string line, temp;
-        // 读取第一个序列
-        std::getline(file, line);
-        std::istringstream iss1(line.substr(line.find(":") + 1));
-        seq1.clear();
-        while (iss1 >> temp) {
-            seq1.push_back(std::stoi(temp));
-        }
+    // if (file.is_open()) {
+    //     std::string line, temp;
+    //     // 读取第一个序列
+    //     std::getline(file, line);
+    //     std::istringstream iss1(line.substr(line.find(":") + 1));
+    //     seq1.clear();
+    //     while (iss1 >> temp) {
+    //         seq1.push_back(std::stoi(temp));
+    //     }
         
-        // 读取第二个序列
-        std::getline(file, line);
-        std::istringstream iss2(line.substr(line.find(":") + 1));
-        seq2.clear();
-        while (iss2 >> temp) {
-            seq2.push_back(std::stoi(temp));
-        }
+    //     // 读取第二个序列
+    //     std::getline(file, line);
+    //     std::istringstream iss2(line.substr(line.find(":") + 1));
+    //     seq2.clear();
+    //     while (iss2 >> temp) {
+    //         seq2.push_back(std::stoi(temp));
+    //     }
         
-        file.close();
-        return {seq1, seq2};
-    }
+    //     file.close();
+    //     return {seq1, seq2};
+    // }
 
 
     // set random seed
@@ -113,21 +197,22 @@ std::pair<std::vector<int>, std::vector<int>> generateLCS(int length1, int lengt
         }
     }
 
-    // Save results
-    std::ofstream outFile("lcs_data_" + std::to_string(length1) + "_" + std::to_string(length2) + "_" + std::to_string(lcsLength) + ".txt");
-    if (outFile.is_open()) {
-        outFile << "Sequence 1: ";
-        for (int i = 0; i < length1; i++) {
-            outFile << seq1[i] << " ";
-        }
-        outFile << "\nSequence 2: ";
-        for (int i = 0; i < length2; i++) {
-            outFile << seq2[i] << " ";
-        }
-        outFile.close();
-    }
-    
-    return {seq1, seq2};
+    // // Save results
+    // std::ofstream outFile("lcs_data_" + std::to_string(length1) + "_" + std::to_string(length2) + "_" + std::to_string(lcsLength) + ".txt");
+    // if (outFile.is_open()) {
+    //     outFile << "Sequence 1: ";
+    //     for (int i = 0; i < length1; i++) {
+    //         outFile << seq1[i] << " ";
+    //     }
+    //     outFile << "\nSequence 2: ";
+    //     for (int i = 0; i < length2; i++) {
+    //         outFile << seq2[i] << " ";
+    //     }
+    //     outFile.close();
+    // }
+
+    // return {seq1, seq2};
+    get_arrows(seq1, seq2, lcsLength, arrows);
 }
 
 std::vector<int> generateLIS(int length, int lisLength) {

@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
+#include <atomic>
 template <typename T1, typename T2>
 std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
   os << "(" << p.first << "," << p.second << ")";
@@ -40,6 +40,8 @@ class SegmentTree {
   std::vector<std::vector<T>> arrows;
   int granularity = 1000;
   bool parallel = false;
+
+  // std::atomic<int> task_count{0};
 
   /**
    * @brief Get the index of the left child of a node
@@ -167,6 +169,7 @@ class SegmentTree {
    */
   void prefix_min_recursive(size_t x, size_t l, size_t r, T pre) {
     // Early return if this node's value is already greater than pre
+    // std::cout << "prefix_min_recursive: x = " << x << ", l = " << l << ", r = " << r << ", pre = " << pre;
     if (tree[x] > pre) {
       return;
     }
@@ -196,23 +199,32 @@ class SegmentTree {
     // Optimize the traversal based on which child has the minimum value
     if (tree[x] == tree[rc(x)]) {
       if (tree[lc(x)] <= pre && tree[lc(x)] < infinity) {
-        bool do_parallel = parallel && (r - l > granularity);
+        bool do_parallel = (r - l > granularity) && parallel;
         T lc_val = tree[lc(x)];
 
         if (do_parallel) {
-#pragma omp task shared(tree)
+          // task_count.fetch_add(1);
+          // std::cout << "do_parallel" << std::endl;
+          // #pragma omp single
+          // {
+          //   printf("Current working threads: %d\n", omp_get_num_threads());
+          // }
+#pragma omp task
           { prefix_min_recursive(lc(x), l, mid, pre); }
-#pragma omp task shared(tree)
+// #pragma omp task
           { prefix_min_recursive(rc(x), mid + 1, r, lc_val); }
 #pragma omp taskwait
         } else {
+          // std::cout << "do_not_parallel: " << "l: " << l << ", mid: " << mid << ", r: " << r << std::endl;
           prefix_min_recursive(lc(x), l, mid, pre);
           prefix_min_recursive(rc(x), mid + 1, r, lc_val);
         }
       } else {
+        // std::cout << "only right" << std::endl;
         prefix_min_recursive(rc(x), mid + 1, r, pre);
       }
     } else {
+      // std::cout << "only left" << std::endl;
       prefix_min_recursive(lc(x), l, mid, pre);
     }
 
@@ -352,36 +364,6 @@ class SegmentTree {
     // Print right child
     print_subtree(rc(x), depth + 1, mid + 1, r, current_depth + 1, max_depth, indent + "   ", show_indices);
   }
-
-//   /**
-//    * @brief Recursively find the index of the minimum value in a subtree
-//    *
-//    * @param x Current node index in the segment tree
-//    * @param l Left boundary of the current segment
-//    * @param r Right boundary of the current segment
-//    * @return The index of the minimum value in the original array
-//    */
-//   size_t find_min_index_recursive(size_t x, size_t l, size_t r) const {
-//     // If we've reached a leaf node, return the corresponding array index
-//     if (l == r) {
-//       return l;
-//     }
-
-//     size_t mid = (l + r) / 2;
-
-//     // Compare the minimum values in the left and right subtrees
-//     T left_min = tree[lc(x)];
-//     T right_min = tree[rc(x)];
-//     // std::cout << "left_min: " << left_min << ", right_min: " << right_min << std::endl;
-//     // If left subtree has the smaller value, go left
-//     if (left_min <= right_min) {
-//       return find_min_index_recursive(lc(x), l, mid);
-//     }
-//     // Otherwise, go right
-//     else {
-//       return find_min_index_recursive(rc(x), mid + 1, r);
-//     }
-//   }
 
  public:
   /**
@@ -571,6 +553,7 @@ class SegmentTree {
     } else {
       prefix_min_recursive(0, 0, n - 1, infinity);
     }
+    // std::cout << "Task count: " << task_count.load() << std::endl;
   }
 
   /**
