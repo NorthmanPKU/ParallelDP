@@ -25,7 +25,7 @@ long double computeCost(const std::vector<long double>& x, const std::vector<lon
     return left + right;
 }
 
-long double refSol(const std::vector<long double>& input) {
+long double refSol(const std::vector<long double>& input, long double buildCost) {
     size_t n = input.size();
     if (n == 0) return 0;
 
@@ -42,12 +42,10 @@ long double refSol(const std::vector<long double>& input) {
     for (size_t j = 1; j <= n; ++j) {
         E[j] = std::numeric_limits<long double>::max();
         for (size_t i = 0; i < j; ++i) {
-            if (j - i >= 2) {
-                long double cost = computeCost(x, prefixSum, i, j);
-                if (E[i] + cost < E[j]) {
-                    E[j] = E[i] + cost;
-                    backtrack[j] = i;
-                }
+            long double cost = computeCost(x, prefixSum, i, j) + buildCost;
+            if (E[i] + cost < E[j]) {
+                E[j] = E[i] + cost;
+                backtrack[j] = i;
             }
         }
     }
@@ -58,7 +56,7 @@ long double refSol(const std::vector<long double>& input) {
     }
     std::reverse(segments.begin(), segments.end());
 
-    std::cout << "Total cost (distance only): " << E[n] << '\n';
+    std::cout << "Total cost: " << E[n] << '\n';
     std::cout << "Used " << segments.size() << " segments\n";
     for (const auto& [l, r] : segments) {
         std::cout << "  Segment [" << l << ", " << r << "]: ";
@@ -70,25 +68,26 @@ long double refSol(const std::vector<long double>& input) {
 }
 
 int main() {
-    std::vector<long double> pos = {1, 2, 3, 7, 8, 9};
+    std::vector<long double> pos = {1, 2, 3, 7, 8, 9, 10};
+    int buildCost = 10;
 
-    auto costFunc = [](int j, int i, const std::vector<long double>& pos) -> long double {
-        if (j + 1 > i) return 0LL;
+    auto costFunc = [&](int j, int i, const std::vector<long double>& pos) -> long double {  // [j+1, i]
+        if (i - j < 1) return buildCost;
         int len = i - j;
         int mid_idx = j + 1 + (len - 1) / 2;
         long double median = pos[mid_idx];
         long double cost = 0;
         for (int k = j + 1; k <= i; ++k) {
-            cost += std::abs(pos[k] - median);
+          cost += std::abs(pos[k] - median);
         }
-        return cost;
+        return cost + buildCost;
     };
 
     // auto efunc = [](long double d, int j) { return d; };
 
     ConvexGLWS<long double> glws;
     long double result = glws.compute(pos, costFunc);
-    checkTest("GLWS Test", refSol(pos), result);
+    checkTest("GLWS Test", refSol(pos, buildCost), result);
     
     return 0;
 }
