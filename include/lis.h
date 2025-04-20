@@ -2,7 +2,6 @@
 
 #include "segment_tree.h"
 
-
 // struct PaddedInt {
 //     int value;
 //     char padding[60];
@@ -20,7 +19,8 @@ template <typename T, typename Compare = std::less<T>>
 class LIS {
  public:
   // The parameter cmp is a comparison function, defaulting to std::less<T>
-  int compute(const std::vector<T> &data, bool parallel=false, int granularity=0, Compare cmp = Compare(), T inf_value = std::numeric_limits<T>::max()) {
+  int compute(const std::vector<T> &data, bool parallel = false, int granularity = 0, Compare cmp = Compare(),
+              T inf_value = std::numeric_limits<T>::max()) {
     int n = data.size();
     if (n == 0) return 0;
     // dp[i] represents the length of the longest increasing subsequence ending at data[i], initially set to 1
@@ -39,17 +39,17 @@ class LIS {
       // Find the index of "the smallest element in the current prefix"
       cordonIdx = tree.find_min_index();
       if (cordonIdx == -1) break;
-    const int CACHE_LINE = 64 / sizeof(int);
-    int dp_cordon = dp[cordonIdx];
-    int data_cordon = data[cordonIdx];
+      const int CACHE_LINE = 64 / sizeof(int);
+      int dp_cordon = dp[cordonIdx];
+      int data_cordon = data[cordonIdx];
 
 #pragma omp parallel for schedule(dynamic, CACHE_LINE) firstprivate(dp_cordon, data_cordon)
       for (int i = cordonIdx + 1; i < n; i++) {
         if (!finalized[i] && cmp(data_cordon, data[i])) {
-// #pragma omp critical
-//           { dp[i] = std::max(dp[i], dp[cordonIdx] + 1); }
-// #pragma omp atomic update
-            {dp[i] = std::max(dp[i], dp_cordon + 1);}
+          // #pragma omp critical
+          //           { dp[i] = std::max(dp[i], dp[cordonIdx] + 1); }
+          // #pragma omp atomic update
+          { dp[i] = std::max(dp[i], dp_cordon + 1); }
         }
       }
 

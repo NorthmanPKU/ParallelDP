@@ -47,6 +47,7 @@ add_executable(lcs tests/dp_tests/lcs_test.cpp)
 add_executable(lis tests/dp_tests/lis_test.cpp)
 add_executable(lisjc tests/test_lis.cpp)
 add_executable(lcsjc tests/test_lcs.cpp)
+add_executable(glwsjc tests/test_glws.cpp)
 # add_executable(lis tests/dp_tests/lis_test.cpp)
 
 # Link libraries to executables

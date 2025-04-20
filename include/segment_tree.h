@@ -2,6 +2,7 @@
 
 #include <omp.h>
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <functional>
 #include <iostream>
@@ -10,7 +11,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <atomic>
 template <typename T1, typename T2>
 std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
   os << "(" << p.first << "," << p.second << ")";
@@ -211,7 +211,7 @@ class SegmentTree {
           // }
 #pragma omp task
           { prefix_min_recursive(lc(x), l, mid, pre); }
-// #pragma omp task
+          // #pragma omp task
           { prefix_min_recursive(rc(x), mid + 1, r, lc_val); }
 #pragma omp taskwait
         } else {
@@ -233,8 +233,7 @@ class SegmentTree {
   }
 
  public:
-
-/**
+  /**
    * @brief Construct a new Segment Tree object based on an array
    *
    * @param arr The input array to build the tree from
@@ -273,7 +272,12 @@ class SegmentTree {
    */
   SegmentTree(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
               size_t _granularity = 1000)
-      : n(_arrows.size()), infinity(inf_value), arrows(_arrows), prefix_mode(true), granularity(_granularity), parallel(_parallel) {
+      : n(_arrows.size()),
+        infinity(inf_value),
+        arrows(_arrows),
+        prefix_mode(true),
+        granularity(_granularity),
+        parallel(_parallel) {
     std::cout << "SegmentTree Prefix mode init" << std::endl;
     std::cout << "inf_value: " << inf_value << std::endl;
     std::cout << "parallel: " << parallel << std::endl;
@@ -390,9 +394,7 @@ class SegmentTree {
   /**
    * Return the current global minimum value in the tree
    */
-  T global_min() const {
-    return tree[0];
-  }
+  T global_min() const { return tree[0]; }
 
   /**
    * @brief Get the raw tree array
@@ -468,22 +470,22 @@ class SegmentTree {
     size_t node_idx = 0;
     size_t left = 0;
     size_t right = n - 1;
-    
+
     while (left < right) {
-        size_t mid = (left + right) / 2;
-        
-        T left_min = tree[lc(node_idx)];
-        T right_min = tree[rc(node_idx)];
-        
-        if (left_min <= right_min) {
-            node_idx = lc(node_idx);
-            right = mid;
-        } else {
-            node_idx = rc(node_idx);
-            left = mid + 1;
-        }
+      size_t mid = (left + right) / 2;
+
+      T left_min = tree[lc(node_idx)];
+      T right_min = tree[rc(node_idx)];
+
+      if (left_min <= right_min) {
+        node_idx = lc(node_idx);
+        right = mid;
+      } else {
+        node_idx = rc(node_idx);
+        left = mid + 1;
+      }
     }
-    
+
     return left;
   }
 
@@ -566,7 +568,7 @@ class SegmentTree {
    */
   T read(size_t i) {
     if (!prefix_mode) {
-        throw std::runtime_error("This is not Prefix mode");
+      throw std::runtime_error("This is not Prefix mode");
     }
     if (now[i] >= arrows[i].size()) {
       return std::numeric_limits<T>::max();  // Return infinity
