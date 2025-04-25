@@ -1,131 +1,160 @@
+#pragma once
+
+#include <omp.h>
+#include <functional>
+#include <limits>
+#include <unordered_map>
+#include <vector>
+#include "utils.h"
+
 template <typename T, typename Compare = std::less<T>>
 class ConvexGLWS {
  public:
-  T compute(const std::vector<T> &data, std::function<T(int, int)> costFunc, Compare cmp) {
+  // Assume E[i] = D[i]
+  T compute(const std::vector<T> &data, std::function<T(int, int, const std::vector<T> &)> costFunc,
+            Compare cmp = Compare()) {
+    std::vector<long double> pos;
+    pos.reserve(data.size() + 1);
+    pos.push_back(0);
+    pos.insert(pos.end(), data.begin(), data.end());
+
     int n = data.size();
     if (n == 0) return T();
 
-    std::vector<T> dp(n, std::numeric_limits<T>::max());
-    dp[0] = 0;
-
-    std::vector<bool> finalized(n, false);
-    finalized[0] = true;
-    int numFinalized = 1;
-
-    TournamentTree<T, Compare> tree(dp, cmp);
-    tree.remove(0);
-
-    // Compress the optimal decision array. Initially, for states 1 to n-1, the default optimal decision is 0
-    std::vector<Interval> optimal_decisions;
-    if (n > 1) optimal_decisions.push_back({1, n - 1, 0});
-
+    std::vector<T> D(n + 1, std::numeric_limits<T>::max());
+    D[0] = 0;
     int now = 0;
-    while (now < n - 1) {
-      int cordon = tree.query(now + 1, n);
-      if (cordon == -1) break;
 
-      finalized[cordon] = true;
-#pragma omp parallel for schedule(dynamic)
-      for (int i = cordon + 1; i < n; i++) {
-        if (!finalized[i]) {
-          T newCost = dp[cordon] + costFunc(cordon, i);
-          if (cmp(newCost, dp[i])) {
-#pragma omp critical
-            { dp[i] = std::min(dp[i], newCost); }
-          }
-        }
+    std::vector<Interval> B;
+    B.push_back({1, n, 0});
+
+    while (now < n) {
+      int cordon = findCordon(now, D, B, costFunc, cmp, pos);
+#pragma omp parallel for
+      for (int i = now + 1; i < cordon; ++i) {
+        int b = findBest(i, B);
+        D[i] = D[b] + costFunc(b, i, pos);
       }
-
-      tree.remove(cordon);
-
-      UpdateBest(now, cordon, n, dp, optimal_decisions, costFunc, cmp);
-      now = cordon;
+      printf("now: %d\n", now);
+      printf("Cordon: %d\n", cordon);
+      updateBest(now, cordon, n, D, B, costFunc, cmp, pos);
+      std::cout << "D: ";
+      for (const auto &d : D) {
+        std::cout << d << " ";
+      }
+      std::cout << std::endl;
+      now = cordon - 1;
+      printf("------------------------\n");
     }
 
-    return dp[n - 1];
+    return D[n];
   }
 
  private:
-  // FindIntervals: In the state interval [il, ir], find the best decision index
-  // from the candidate decision index interval [jl, jr].
-  std::vector<Interval> FindIntervals(int jl, int jr, int il, int ir, const std::vector<T> &dp,
-                                      std::function<T(int, int)> costFunc, Compare cmp) {
-    std::vector<Interval> intervals;
-    if (il > ir) return intervals;
-    if (il == ir) {
-      int bestCandidate = jl;
-      T bestValue = dp[bestCandidate] + costFunc(bestCandidate, il);
-      for (int j = jl + 1; j <= jr; j++) {
-        T candidate = dp[j] + costFunc(j, il);
-        if (cmp(candidate, bestValue)) {
-          bestValue = candidate;
-          bestCandidate = j;
+  int findCordon(int now, std::vector<T> &D, const std::vector<Interval> &B,
+                 std::function<T(int, int, const std::vector<T> &)> costFunc, Compare cmp, const std::vector<T> &data) {
+    int n = data.size() - 1;
+    int cordon = n + 1;
+    for (int t = 1; (now + (1 << t)) <= n; ++t) {
+      int l = now + (1 << (t - 1));
+      int r = std::min(n, now + (1 << t) - 1);
+      printf("l: %d, r: %d\n", l, r);
+      std::vector<int> s_j(r - l + 1, n + 1);
+      // #pragma omp parallel for schedule(dynamic)
+      for (int j = l; j <= r; ++j) {
+        int bestj = findBest(j, B);
+        printf("j: %d, bestj: %d\n", j, bestj);
+        T Ej = D[bestj] + costFunc(bestj, j, data);
+        T Dj = Ej;
+        if (cmp(Dj, D[j])) {
+          printf("Updating D[%d]: %Lf\n", j, Dj);
+          // Relax j
+          // Now find the earliest state i > j s.t. j can relax i better than its current best
+          for (int i = j + 1; i <= n; ++i) {
+            int current_best = findBest(i, B);
+            T current_val = D[current_best] + costFunc(current_best, i, data);
+            T candidate_val = Dj + costFunc(j, i, data);
+            std::cout << "D[current_best]: " << D[current_best]
+                      << " + costFunc(current_best, j, data): " << costFunc(current_best, j, data) << std::endl;
+            std::cout << "Dj: " << Dj << " + costFunc(j, i, data): " << costFunc(j, i, data) << std::endl;
+            if (cmp(candidate_val, current_val)) {
+#pragma omp critical
+              { s_j[j - l] = i; }
+              printf("Relaxing j: %d, i: %d\n", j, i);
+              break;
+            }
+          }
+        } else {
+          s_j[j - l] = n + 1;
         }
       }
-      intervals.push_back({il, ir, bestCandidate});
-      return intervals;
+      for (int x : s_j) cordon = std::min(cordon, x);
+      if (cordon <= r + 1) break;
     }
-    int im = (il + ir) / 2;
-    int bestCandidate = jl;
-    T bestValue = dp[bestCandidate] + costFunc(bestCandidate, im);
-    for (int j = jl + 1; j <= jr; j++) {
-      T candidate = dp[j] + costFunc(j, im);
-      if (cmp(candidate, bestValue)) {
-        bestValue = candidate;
-        bestCandidate = j;
-      }
-    }
-
-    std::vector<Interval> leftIntervals, rightIntervals;
-    // Determine if the problem size is large enough (i.e., the subproblem size exceeds the threshold)
-    // to create tasks, preventing the overhead of overly fine-grained tasks.
-    const int THRESHOLD = 20;
-    if (ir - il > THRESHOLD) {
-#pragma omp task shared(leftIntervals)
-      { leftIntervals = FindIntervals(jl, bestCandidate, il, im - 1, dp, costFunc, cmp); }
-#pragma omp task shared(rightIntervals)
-      { rightIntervals = FindIntervals(bestCandidate, jr, im + 1, ir, dp, costFunc, cmp); }
-#pragma omp taskwait
-    } else {
-      // For small subproblems, compute sequentially
-      leftIntervals = FindIntervals(jl, bestCandidate, il, im - 1, dp, costFunc, cmp);
-      rightIntervals = FindIntervals(bestCandidate, jr, im + 1, ir, dp, costFunc, cmp);
-    }
-
-    intervals.insert(intervals.end(), leftIntervals.begin(), leftIntervals.end());
-    intervals.push_back({im, im, bestCandidate});
-    intervals.insert(intervals.end(), rightIntervals.begin(), rightIntervals.end());
-    return intervals;
+    return cordon;
   }
 
-  // Update the compressed best decision array B,
-  void UpdateBest(int now, int cordon, int n, std::vector<T> &dp, std::vector<Interval> &B,
-                  std::function<T(int, int)> costFunc, Compare cmp) {
-    std::vector<Interval> B_new = FindIntervals(now + 1, cordon - 1, cordon, n - 1, dp, costFunc, cmp);
-    // Merge B_new with the old B: Keep the part of B_old that covers [0, cordon-1], then append B_new
-    std::vector<Interval> B_merged;
-    for (const auto &interval : B) {
-      if (interval.r < cordon) {
-        B_merged.push_back(interval);
-      }
-    }
-    for (const auto &interval : B_new) {
-      B_merged.push_back(interval);
-    }
-    // Simply merge adjacent intervals with the same best decision
-    if (!B_merged.empty()) {
-      std::vector<Interval> B_compact;
-      B_compact.push_back(B_merged[0]);
-      for (size_t i = 1; i < B_merged.size(); i++) {
-        if (B_merged[i].j == B_compact.back().j && B_merged[i].l == B_compact.back().r + 1) {
-          B_compact.back().r = B_merged[i].r;
+  void updateBest(int now, int cordon, int n, std::vector<T> &D, std::vector<Interval> &B,
+                  std::function<T(int, int, const std::vector<T> &)> costFunc, Compare cmp,
+                  const std::vector<T> &data) {
+    std::vector<Interval> B_new = findIntervals(now + 1, cordon - 1, cordon, n, D, costFunc, cmp, data);
+    std::vector<Interval> merged;
+    for (const auto &interval : B)
+      if (interval.r < cordon) merged.push_back(interval);
+    for (const auto &interval : B_new) merged.push_back(interval);
+
+    std::vector<Interval> compact;
+    if (!merged.empty()) {
+      compact.push_back(merged[0]);
+      for (size_t i = 1; i < merged.size(); i++) {
+        if (merged[i].j == compact.back().j && merged[i].l == compact.back().r + 1) {
+          compact.back().r = merged[i].r;
         } else {
-          B_compact.push_back(B_merged[i]);
+          compact.push_back(merged[i]);
         }
       }
-      B = B_compact;
-    } else {
-      B = B_merged;
     }
+    B = compact;
+    std::cout << "B after updateBest: ";
+    for (const auto &interval : B) {
+      std::cout << "[" << interval.l << "," << interval.r << "]→" << interval.j << " ";
+    }
+    std::cout << std::endl;
+  }
+
+  std::vector<Interval> findIntervals(int jl, int jr, int il, int ir, const std::vector<T> &D,
+                                      std::function<T(int, int, const std::vector<T> &)> costFunc, Compare cmp,
+                                      const std::vector<T> &data) {
+    std::vector<Interval> result;
+    if (il > ir) return result;
+    if (il == ir) {
+      int best = jl;
+      T val = D[best] + costFunc(best, il, data);
+      for (int j = jl + 1; j <= jr; ++j) {
+        T cand = D[j] + costFunc(j, il, data);
+        if (cmp(cand, val)) {
+          val = cand;
+          best = j;
+        }
+      }
+      result.push_back({il, ir, best});
+      return result;
+    }
+    int im = (il + ir) / 2;
+    int best = jl;
+    T val = D[best] + costFunc(best, im, data);
+    for (int j = jl + 1; j <= jr; ++j) {
+      T cand = D[j] + costFunc(j, im, data);
+      if (cmp(cand, val)) {
+        val = cand;
+        best = j;
+      }
+    }
+    auto L = findIntervals(jl, best, il, im - 1, D, costFunc, cmp, data);
+    auto R = findIntervals(best, jr, im + 1, ir, D, costFunc, cmp, data);
+    result.insert(result.end(), L.begin(), L.end());
+    result.push_back({im, im, best});
+    result.insert(result.end(), R.begin(), R.end());
+    return result;
   }
 };

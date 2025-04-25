@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <unordered_map>
 #include "lis.h"
 #include "segment_tree.h"
@@ -18,7 +19,8 @@ class LCS {
   /**
    * @brief Conver lcs to lis to compute
    */
-  int compute_as_lis(const std::vector<T> &data1, const std::vector<T> &data2, bool parallel=false, int granularity=0) {
+  int compute_as_lis(const std::vector<T> &data1, const std::vector<T> &data2, bool parallel = false,
+                     int granularity = 0) {
     int n = data1.size(), m = data2.size();
     if (n == 0 || m == 0) return 0;
 
@@ -54,8 +56,9 @@ class LCS {
     return lis.compute(effectiveStates, parallel, granularity, effComp, max_pair);
   }
 
-  int compute_as_lis(const std::string &data1, const std::string &data2, bool parallel=false, int granularity=0) {
-    return compute_as_lis(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), parallel, granularity);
+  int compute_as_lis(const std::string &data1, const std::string &data2, bool parallel = false, int granularity = 0) {
+    return compute_as_lis(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()),
+                          parallel, granularity);
   }
 
   int compute_arrows(std::vector<std::vector<int>> &arrows, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
@@ -105,7 +108,8 @@ class LCS {
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "Prepare time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    std::cout << "Prepare time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
+              << std::endl;
     // std::cout << "arrows: " << std::endl;
     // for (int i = 0; i < n; i++) {
     //   std::cout << "arrows[" << i << "]: ";
@@ -120,5 +124,4 @@ class LCS {
   int compute(const std::string &data1, const std::string &data2, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
     return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), arch, parallel, granularity);
   }
-
 };

@@ -107,6 +107,7 @@ target_link_directories(OpenCilkOptions INTERFACE ${OPENCILK_INSTALL_DIR}/lib)
 # Executables
 add_executable(lis tests/test_lis.cpp)
 add_executable(lcs tests/test_lcs.cpp)
+add_executable(glws tests/test_glws.cpp)
 
 target_link_libraries(lis PRIVATE
     OpenCilkOptions
