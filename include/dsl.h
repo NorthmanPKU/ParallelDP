@@ -14,10 +14,6 @@
 
 namespace dp_dsl {
 
-// Forward declarations
-class DPProblem;
-class ProblemRecognizer;
-class DataInput;
 
 // Enumeration for different DP problem types
 enum class ProblemType {
@@ -56,22 +52,35 @@ struct Constraint {
 };
 
 // Data input representation
-class DataInput {
+// Base class for defining DP problems
+class DPProblem {
 public:
-    using DataType = std::variant<std::vector<int>, std::vector<double>, std::vector<std::string>>;
-    
-    void addSequence(const std::string& name, const std::vector<int>& data) {
+    virtual ~DPProblem() = default;
+
+    // Problem definition methods
+    void addStateVariable(const std::string& name, int min, int max) {
+        state_variables.emplace_back(name, min, max);
+    }
+
+    void addConstraint(const std::string& var1, const std::string& var2, 
+                      Constraint::ConstraintType type) {
+        constraints.emplace_back(var1, var2, type);
+    }
+
+    void setObjective(Objective obj) {
+        objective = obj;
+    }
+
+    void setRecurrence(std::function<void(const std::map<std::string, int>&)> recurrence_func) {
+        this->recurrence_func = recurrence_func;
+    }
+
+    // Data input methods
+    template<typename T>
+    void addSequence(const std::string& name, const std::vector<T>& data) {
         data_map[name] = data;
     }
-    
-    void addSequence(const std::string& name, const std::vector<double>& data) {
-        data_map[name] = data;
-    }
-    
-    void addSequence(const std::string& name, const std::vector<std::string>& data) {
-        data_map[name] = data;
-    }
-    
+
     template<typename T>
     const std::vector<T>& getSequence(const std::string& name) const {
         auto it = data_map.find(name);
@@ -80,73 +89,15 @@ public:
         }
         return std::get<std::vector<T>>(it->second);
     }
-    
+
     bool hasSequence(const std::string& name) const {
         return data_map.find(name) != data_map.end();
     }
-    
-private:
-    std::map<std::string, DataType> data_map;
-};
 
-// Base class for defining DP problems
-class DPProblem {
-public:
-    virtual ~DPProblem() = default;
-    
-    // Problem definition methods
-    void addStateVariable(const std::string& name, int min, int max) {
-        state_variables.emplace_back(name, min, max);
-    }
-    
-    void addConstraint(const std::string& var1, const std::string& var2, 
-                      Constraint::ConstraintType type) {
-        constraints.emplace_back(var1, var2, type);
-    }
-    
-    void setObjective(Objective obj) {
-        objective = obj;
-    }
-    
-    void setRecurrence(std::function<void(const std::map<std::string, int>&)> recurrence_func) {
-        this->recurrence_func = recurrence_func;
-    }
-    
-    // Data input
-    DataInput& data() {
-        return data_input;
-    }
-    
     // Problem recognition
     ProblemType getProblemType() const {
-        return ProblemRecognizer::recognize(*this);
-    }
-    
-    // Getters for problem structure
-    const std::vector<StateVariable>& getStateVariables() const { return state_variables; }
-    const std::vector<Constraint>& getConstraints() const { return constraints; }
-    Objective getObjective() const { return objective; }
-    
-protected:
-    std::vector<StateVariable> state_variables;
-    std::vector<Constraint> constraints;
-    Objective objective = Objective::MAXIMIZE;
-    std::function<void(const std::map<std::string, int>&)> recurrence_func;
-    DataInput data_input;
-};
-
-// Problem recognizer
-class ProblemRecognizer {
-public:
-    static ProblemType recognize(const DPProblem& problem) {
-        // Analyze problem structure to determine type
-        const auto& vars = problem.getStateVariables();
-        const auto& constraints = problem.getConstraints();
-        const auto objective = problem.getObjective();
-        
         // LIS recognition pattern
-        if (vars.size() == 1 && objective == Objective::MAXIMIZE) {
-            // Check for monotonicity constraint
+        if (state_variables.size() == 1 && objective == Objective::MAXIMIZE) {
             for (const auto& constraint : constraints) {
                 if (constraint.type == Constraint::ConstraintType::LESS_THAN &&
                     (constraint.var1 == "j" && constraint.var2 == "i") ||
@@ -155,23 +106,29 @@ public:
                 }
             }
         }
-        
+
         // LCS recognition pattern
-        if (vars.size() == 2 && objective == Objective::MAXIMIZE) {
-            // Check for two sequences
-            if (problem.data().hasSequence("seq1") && problem.data().hasSequence("seq2")) {
+        if (state_variables.size() == 2 && objective == Objective::MAXIMIZE) {
+            if (hasSequence("seq1") && hasSequence("seq2")) {
                 return ProblemType::LCS;
             }
         }
-        
+
         // Convex GLWS recognition pattern
-        if (vars.size() <= 2 && objective == Objective::MINIMIZE) {
-            // Check for cost function signature
+        if (state_variables.size() <= 2 && objective == Objective::MINIMIZE) {
             return ProblemType::CONVEX_GLWS;
         }
-        
+
         return ProblemType::UNKNOWN;
     }
+
+protected:
+    std::vector<StateVariable> state_variables;
+    std::vector<Constraint> constraints;
+    Objective objective = Objective::MAXIMIZE;
+    std::function<void(const std::map<std::string, int>&)> recurrence_func;
+    using DataType = std::variant<std::vector<int>, std::vector<long double>, std::vector<std::string>>;
+    std::map<std::string, DataType> data_map;
 };
 
 // Solver dispatcher that routes to appropriate backend
@@ -183,11 +140,11 @@ public:
         
         switch (type) {
             case ProblemType::LIS:
-                return solveLIS(problem);
+                return solveLIS<T>(problem);
             case ProblemType::LCS:
-                return solveLCS(problem);
+                return solveLCS<T>(problem);
             case ProblemType::CONVEX_GLWS:
-                return solveConvexGLWS(problem);
+                return solveConvexGLWS<T>(problem);
             default:
                 throw std::runtime_error("Cannot solve problem: unknown type");
         }
@@ -196,8 +153,7 @@ public:
 private:
     template<typename T>
     static T solveLIS(DPProblem& problem) {
-        auto& data = problem.data();
-        const auto& sequence = data.getSequence<int>("sequence");
+        const auto& sequence = problem.getSequence<int>("sequence");
         
         // Create backend solver
         LIS<int> solver;
@@ -206,9 +162,8 @@ private:
     
     template<typename T>
     static T solveLCS(DPProblem& problem) {
-        auto& data = problem.data();
-        const auto& seq1 = data.getSequence<int>("seq1");
-        const auto& seq2 = data.getSequence<int>("seq2");
+        const auto& seq1 = problem.getSequence<int>("seq1");
+        const auto& seq2 = problem.getSequence<int>("seq2");
         
         // Create backend solver
         LCS<int> solver;
@@ -217,20 +172,30 @@ private:
     
     template<typename T>
     static T solveConvexGLWS(DPProblem& problem) {
-        auto& data = problem.data();
-        const auto& sequence = data.getSequence<double>("data");
+        const auto& sequence = problem.getSequence<T>("data");
         
-        // Extract cost function (would need to be stored in problem definition)
-        // For now, use a placeholder
-        auto cost_func = [](int i, int j) -> double { return (j - i) * (j - i); };
+        int buildCost = 10;
+
+        auto costFunc = [&](int j, int i, const std::vector<T>& pos) -> T {  // [j+1, i]
+            if (i - j < 1) return buildCost;
+            int len = i - j;
+            int mid_idx = j + 1 + (len - 1) / 2;
+            T median = pos[mid_idx];
+            T cost = 0;
+            for (int k = j + 1; k <= i; ++k) {
+            cost += std::abs(pos[k] - median);
+            }
+            return cost + buildCost;
+        };
         
         // Create backend solver  
-        ConvexGLWS<double> solver;
-        return solver.compute(sequence, cost_func, std::less<double>());
+        ConvexGLWS<T> solver;
+        return solver.compute(sequence, costFunc, std::less<T>());
     }
 };
 
 // Builder pattern for easier problem creation
+template<typename T>
 class ProblemBuilder {
 public:
     static ProblemBuilder create() {
@@ -238,44 +203,44 @@ public:
     }
     
     ProblemBuilder& withStateVariable(const std::string& name, int min, int max) {
-        problem.addStateVariable(name, min, max);
+        problem_.addStateVariable(name, min, max);
         return *this;
     }
     
     ProblemBuilder& withConstraint(const std::string& var1, const std::string& var2, 
                                  Constraint::ConstraintType type) {
-        problem.addConstraint(var1, var2, type);
+        problem_.addConstraint(var1, var2, type);
         return *this;
     }
     
     ProblemBuilder& withObjective(Objective obj) {
-        problem.setObjective(obj);
+        problem_.setObjective(obj);
         return *this;
     }
     
     ProblemBuilder& withRecurrence(std::function<void(const std::map<std::string, int>&)> func) {
-        problem.setRecurrence(func);
+        problem_.setRecurrence(func);
         return *this;
     }
     
-    ProblemBuilder& withSequence(const std::string& name, const std::vector<int>& data) {
-        problem.data().addSequence(name, data);
+    ProblemBuilder& withSequence(const std::string& name, const std::vector<T>& data) {
+        problem_.addSequence(name, data);
         return *this;
     }
     
     DPProblem build() {
-        return std::move(problem);
+        return std::move(problem_);
     }
     
 private:
-    DPProblem problem;
+    DPProblem problem_;
 };
 
 // Convenience factory methods for common problems
 class CommonProblems {
 public:
     static DPProblem createLIS(const std::vector<int>& sequence) {
-        return ProblemBuilder::create()
+        return ProblemBuilder<int>::create()
             .withStateVariable("i", 0, sequence.size())
             .withConstraint("j", "i", Constraint::ConstraintType::LESS_THAN)
             .withObjective(Objective::MAXIMIZE)
@@ -284,7 +249,7 @@ public:
     }
     
     static DPProblem createLCS(const std::vector<int>& seq1, const std::vector<int>& seq2) {
-        return ProblemBuilder::create()
+        return ProblemBuilder<int>::create()
             .withStateVariable("i", 0, seq1.size())
             .withStateVariable("j", 0, seq2.size())
             .withObjective(Objective::MAXIMIZE)
@@ -293,9 +258,9 @@ public:
             .build();
     }
     
-    static DPProblem createConvexGLWS(const std::vector<double>& data, 
+    static DPProblem createConvexGLWS(const std::vector<long double>& data, 
                                     std::function<double(int, int)> cost_func) {
-        auto problem = ProblemBuilder::create()
+        auto problem = ProblemBuilder<long double>::create()
             .withStateVariable("i", 0, data.size())
             .withObjective(Objective::MINIMIZE)
             .withSequence("data", data)

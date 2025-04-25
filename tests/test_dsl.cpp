@@ -1,4 +1,4 @@
-#include "dp_dsl.h"
+#include "dsl.h"
 #include <iostream>
 #include <vector>
 
@@ -6,7 +6,7 @@ int main() {
     using namespace dp_dsl;
     
     // Example 1: Defining LIS problem using builder pattern
-    auto lis_problem = ProblemBuilder::create()
+    auto lis_problem = ProblemBuilder<int>::create()
         .withStateVariable("i", 0, 10)
         .withConstraint("j", "i", Constraint::ConstraintType::LESS_THAN)
         .withObjective(Objective::MAXIMIZE)
@@ -38,23 +38,23 @@ int main() {
     std::cout << "LCS result: " << lcs_result << std::endl;
     
     // Example 3: Manual problem definition for Convex GLWS
-    auto glws_problem = ProblemBuilder::create()
+    auto glws_problem = ProblemBuilder<long double>::create()
         .withStateVariable("i", 0, 20)
         .withStateVariable("j", 0, 20)
         .withObjective(Objective::MINIMIZE)
         .withConstraint("i", "j", Constraint::ConstraintType::LESS_THAN)
-        .withSequence("data", std::vector<double>{1.0, 2.5, 3.0, 4.2, 5.1, 6.3})
+        .withSequence("data", std::vector<long double>{1.0, 2.5, 3.0, 4.2, 5.1, 6.3})
         .withRecurrence([](const std::map<std::string, int>& state) {
             // Recurrence relation for convex GLWS
             // dp[i][j] = min(dp[i][k] + cost(k, j)) for all k in [i, j)
         })
         .build();
     
-    double glws_result = SolverDispatcher::solve<double>(glws_problem);
+    double glws_result = SolverDispatcher::solve<long double>(glws_problem);
     std::cout << "Convex GLWS result: " << glws_result << std::endl;
     
     // Example 4: Generic problem definition that will be analyzed
-    auto generic_problem = ProblemBuilder::create()
+    auto generic_problem = ProblemBuilder<int>::create()
         .withStateVariable("position", 0, 100)
         .withObjective(Objective::MAXIMIZE)
         .withSequence("values", {10, 20, 30, 15, 25, 35})
