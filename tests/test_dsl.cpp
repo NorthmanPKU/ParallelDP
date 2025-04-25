@@ -44,6 +44,7 @@ int main() {
         .withObjective(Objective::MINIMIZE)
         .withConstraint("i", "j", Constraint::ConstraintType::LESS_THAN)
         .withSequence("data", std::vector<long double>{1.0, 2.5, 3.0, 4.2, 5.1, 6.3})
+        .withValue("buildCost", 10.0)
         .withRecurrence([](const std::map<std::string, int>& state) {
             // Recurrence relation for convex GLWS
             // dp[i][j] = min(dp[i][k] + cost(k, j)) for all k in [i, j)

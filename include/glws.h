@@ -13,7 +13,7 @@ class ConvexGLWS {
   // Assume E[i] = D[i]
   T compute(const std::vector<T> &data, std::function<T(int, int, const std::vector<T> &)> costFunc,
             Compare cmp = Compare()) {
-    std::vector<long double> pos;
+    std::vector<T> pos;
     pos.reserve(data.size() + 1);
     pos.push_back(0);
     pos.insert(pos.end(), data.begin(), data.end());

@@ -82,12 +82,26 @@ public:
     }
 
     template<typename T>
+    void addValue(const std::string& name, T value) {
+        data_map[name] = value;
+    }
+
+    template<typename T>
     const std::vector<T>& getSequence(const std::string& name) const {
         auto it = data_map.find(name);
         if (it == data_map.end()) {
             throw std::runtime_error("Sequence not found: " + name);
         }
         return std::get<std::vector<T>>(it->second);
+    }
+
+    template<typename T>
+    const T getValue(const std::string& name) const {
+        auto it = data_map.find(name);
+        if (it == data_map.end()) {
+            throw std::runtime_error("Value not found: " + name);
+        }
+        return std::get<T>(it->second);
     }
 
     bool hasSequence(const std::string& name) const {
@@ -127,7 +141,7 @@ protected:
     std::vector<Constraint> constraints;
     Objective objective = Objective::MAXIMIZE;
     std::function<void(const std::map<std::string, int>&)> recurrence_func;
-    using DataType = std::variant<std::vector<int>, std::vector<long double>, std::vector<std::string>>;
+    using DataType = std::variant<std::vector<int>, std::vector<long double>, std::vector<std::string>, long double, int, std::string>;
     std::map<std::string, DataType> data_map;
 };
 
@@ -173,8 +187,7 @@ private:
     template<typename T>
     static T solveConvexGLWS(DPProblem& problem) {
         const auto& sequence = problem.getSequence<T>("data");
-        
-        int buildCost = 10;
+        const auto& buildCost = problem.getValue<T>("buildCost");
 
         auto costFunc = [&](int j, int i, const std::vector<T>& pos) -> T {  // [j+1, i]
             if (i - j < 1) return buildCost;
@@ -225,6 +238,11 @@ public:
     
     ProblemBuilder& withSequence(const std::string& name, const std::vector<T>& data) {
         problem_.addSequence(name, data);
+        return *this;
+    }
+
+    ProblemBuilder& withValue(const std::string& name, T value) {
+        problem_.addValue(name, value);
         return *this;
     }
     
