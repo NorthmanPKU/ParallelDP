@@ -13,11 +13,8 @@
 #include <vector>
 #include <atomic>
 
-template <typename T1, typename T2>
-std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
-  os << "(" << p.first << "," << p.second << ")";
-  return os;
-}
+#include "tree.h"
+#include "utils.h"
 
 /**
  * @brief A comprehensive segment tree implementation supporting both sequential and parallel builds.
@@ -29,7 +26,7 @@ std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
  * @tparam T The data type stored in the segment tree (must support comparison)
  */
 template <typename T>
-class SegmentTree {
+class SegmentTreeCilk : public Tree<T> {
  private:
   std::vector<T> tree;       // The segment tree array
   size_t n;                  // Number of leaf nodes
@@ -215,7 +212,7 @@ class SegmentTree {
    * @param arr The input array to build the tree from
    * @param inf_value The value to use as infinity (default: maximum value of type T)
    */
-  SegmentTree(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
+  SegmentTreeCilk(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
               size_t granularity = 1000)
       : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
     std::cout << "SegmentTree init" << std::endl;
@@ -230,7 +227,8 @@ class SegmentTree {
       // TODO: A current workaround for string comparison
       infinity = "zzzzzzzzzzzzzzzzzzzz";
     }
-    tree.resize(4 * n, inf_value);
+    // tree.resize(4 * n, inf_value);
+    tree.resize(4 * n);
     build(arr);
   }
 
@@ -242,7 +240,7 @@ class SegmentTree {
    * @param parallel Whether to build the tree in parallel
    * @param granularity The minimum size of a subtree to process in parallel
    */
-  SegmentTree(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
+  SegmentTreeCilk(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
               size_t _granularity = 1000)
       : n(_arrows.size()), infinity(inf_value), arrows(_arrows), prefix_mode(true), granularity(_granularity), parallel(_parallel) {
     std::cout << "SegmentTree Prefix mode init" << std::endl;
@@ -253,7 +251,8 @@ class SegmentTree {
       // TODO: A current workaround for string comparison
       infinity = "zzzzzzzzzzzzzzzzzzzz";
     }
-    tree.resize(4 * n, inf_value);
+    // tree.resize(4 * n, inf_value);
+    tree.resize(4 * n);
     now.resize(n, 0);
     std::vector<T> arr(n);
     for (size_t i = 0; i < n; ++i) {
@@ -361,7 +360,7 @@ class SegmentTree {
   /**
    * Return the current global minimum value in the tree
    */
-  T global_min() const {
+  T global_min() override {
     return tree[0];
   }
 
@@ -422,7 +421,7 @@ class SegmentTree {
    * @return The index of the minimum value in the original array
    * @throws std::runtime_error if the tree has not been constructed
    */
-  size_t find_min_index() const {
+  size_t find_min_index() override {
     if (!constructed) {
       throw std::runtime_error("Segment tree has not been constructed");
     }
@@ -477,7 +476,7 @@ class SegmentTree {
    * @throws std::invalid_argument if the arrow sequences or now indices are invalid
    * @throws std::runtime_error if the tree has not been constructed
    */
-  void prefix_min() {
+  void prefix_min() override {
     if (!prefix_mode) {
       throw std::runtime_error("This is not Prefix mode");
     }
@@ -532,7 +531,7 @@ class SegmentTree {
    * @throws std::out_of_range if the position is out of bounds
    * @throws std::runtime_error if the tree has not been constructed
    */
-  void remove(size_t pos) {
+  void remove(size_t pos) override {
     if (!constructed) {
       throw std::runtime_error("Segment tree has not been constructed");
     }
@@ -547,9 +546,9 @@ class SegmentTree {
   }
 };
 
-template class SegmentTree<int>;
-template class SegmentTree<float>;
-template class SegmentTree<double>;
-template class SegmentTree<long>;
-template class SegmentTree<std::string>;
-template class SegmentTree<std::pair<int, int>>;
+template class SegmentTreeCilk<int>;
+template class SegmentTreeCilk<float>;
+template class SegmentTreeCilk<double>;
+template class SegmentTreeCilk<long>;
+template class SegmentTreeCilk<std::string>;
+template class SegmentTreeCilk<std::pair<int, int>>;

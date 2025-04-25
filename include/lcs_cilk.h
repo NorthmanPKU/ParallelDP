@@ -2,19 +2,14 @@
 
 #include <unordered_map>
 #include "lis.h"
-#include "segment_tree.h"
 #include "segment_tree_cilk.h"
-#include "utils.h"
 #include <chrono>
 
 // Use the Cordon algorithm to solve the Longest Common Subsequence (LCS) problem,
 // supporting any data type T and user-defined comparison functions.
 template <typename T, typename Compare = std::less<T>>
 class LCS {
-  private:
-    std::unique_ptr<Tree<int>> tree;
  public:
-
   /**
    * @brief Conver lcs to lis to compute
    */
@@ -58,31 +53,23 @@ class LCS {
     return compute_as_lis(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), parallel, granularity);
   }
 
-  int compute_arrows(std::vector<std::vector<int>> &arrows, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
+  int compute_arrows(std::vector<std::vector<int>> &arrows, bool parallel=false, int granularity=0) {
     auto start = std::chrono::high_resolution_clock::now();
-    if (arch == ParallelArch::CILK) {
-      tree = std::make_unique<SegmentTreeCilk<int>>(arrows, std::numeric_limits<int>::max(), parallel, granularity);
-    } else if (arch == ParallelArch::OPENMP) {
-      tree = std::make_unique<SegmentTreeOpenMP<int>>(arrows, std::numeric_limits<int>::max(), parallel, granularity);
-    } else {
-      throw std::invalid_argument("Invalid parallel architecture");
-    }
+    SegmentTree<int> tree(arrows, std::numeric_limits<int>::max(), parallel, granularity);
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << ", Tree building time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    
     int round = 0;
-    while (tree->global_min() < std::numeric_limits<int>::max()) {
+    while (tree.global_min() < std::numeric_limits<int>::max()) {
       round++;
-      tree->prefix_min();
+      tree.prefix_min();
     }
     auto end2 = std::chrono::high_resolution_clock::now();
     std::cout << ", LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count();
-
     return round;
   }
 
   // without using arrows
-  int compute(const std::vector<T> &data1, const std::vector<T> &data2, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
+  int compute(const std::vector<T> &data1, const std::vector<T> &data2, bool parallel=false, int granularity=0) {
     auto start = std::chrono::high_resolution_clock::now();
     int n = data1.size(), m = data2.size();
     if (n == 0 || m == 0) return 0;
@@ -114,11 +101,11 @@ class LCS {
     //   }
     //   std::cout << std::endl;
     // }
-    return compute_arrows(arrows, arch, parallel, granularity);
+    return compute_arrows(arrows, parallel, granularity);
   }
 
-  int compute(const std::string &data1, const std::string &data2, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
-    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), arch, parallel, granularity);
+  int compute(const std::string &data1, const std::string &data2, bool parallel=false, int granularity=0) {
+    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), parallel, granularity);
   }
 
 };

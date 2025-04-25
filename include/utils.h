@@ -5,8 +5,22 @@
 #include <random>
 #include <fstream>
 #include <sstream>
+
+// enum including CILK and OpenMP
+enum class ParallelArch {
+  CILK,
+  OPENMP,
+  NONE
+};
+
+template <typename T1, typename T2>
+std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
+  os << "(" << p.first << "," << p.second << ")";
+  return os;
+}
+
 // Used to store compressed information of the best decisions: indicates that for all states within the interval [l, r],
-// their current best decision is j
+// their
 struct Interval {
   int l;
   int r;

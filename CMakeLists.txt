@@ -7,6 +7,38 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Optional: Enable OpenMP when building OpenCilk
 set(OPENCILK_ENABLE_OPENMP ON)
 
+add_library(OpenCilkOptions INTERFACE)
+# --- Find OpenMP ---
+find_path(OpenMP_INCLUDE_DIR omp.h
+    PATHS
+        /usr/include
+        /usr/local/include
+        /usr/lib/gcc/x86_64-redhat-linux/8/include  # 根据您的系统路径调整
+)
+
+if(OpenMP_INCLUDE_DIR)
+    message(STATUS "Found OpenMP headers at: ${OpenMP_INCLUDE_DIR}")
+    include_directories(${OpenMP_INCLUDE_DIR})
+    
+    target_include_directories(OpenCilkOptions INTERFACE ${OpenMP_INCLUDE_DIR})
+else()
+    message(FATAL_ERROR "Could not find OpenMP headers (omp.h)")
+endif()
+
+set(OpenMP_CXX_FLAGS "-fopenmp")
+set(OpenMP_CXX_LIB_NAMES "gomp")  # 如果你使用的是 GNU OpenMP，可以改为 libomp
+set(OpenMP_gomp_LIBRARY "/usr/lib/gcc/x86_64-redhat-linux/8/libgomp.so")  # 根据你系统的 libgomp.so 路径调整
+
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    message(STATUS "Found OpenMP and added to flags")
+else()
+    message(FATAL_ERROR "OpenMP not found, please ensure it is installed properly.")
+endif()
+
+
+
 # --- Try to find OpenCilk compiler installed locally ---
 include(ExternalProject)
 
@@ -44,43 +76,7 @@ endif()
 
 # --- If not found, build OpenCilk from source ---
 if(NOT OPENCILK_FOUND)
-    # err
     message(FATAL_ERROR "OpenCilk not found. Please run install.sh.")
-#     message(STATUS "Installing OpenCilk from source...")
-
-#     # Write patch script to modify OPENCILK_RUNTIMES to include openmp
-#     set(PATCH_SCRIPT "${CMAKE_BINARY_DIR}/patch_opencilk_build.cmake")
-#     file(WRITE ${PATCH_SCRIPT} "
-# set(_BUILD_SCRIPT \"${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/tools/build\")
-# file(READ \"\${_BUILD_SCRIPT}\" _BUILD_CONTENTS)
-# if(NOT _BUILD_CONTENTS MATCHES \"cheetah;cilktools;openmp\")
-#     string(REPLACE
-#         \"OPENCILK_RUNTIMES=\\\"cheetah;cilktools\\\" # Required runtimes\"
-#         \"OPENCILK_RUNTIMES=\\\"cheetah;cilktools;openmp\\\" # Required runtimes\"
-#         _PATCHED_CONTENTS \"\${_BUILD_CONTENTS}\")
-#     file(WRITE \"\${_BUILD_SCRIPT}\" \"\${_PATCHED_CONTENTS}\")
-# endif()
-# ")
-
-#     ExternalProject_Add(OpenCilk
-#         PREFIX ${CMAKE_BINARY_DIR}/opencilk
-#         GIT_REPOSITORY https://github.com/OpenCilk/infrastructure
-#         GIT_TAG opencilk/v2.1
-#         CONFIGURE_COMMAND ""
-#         BUILD_COMMAND
-#             ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/tools/get
-#                 ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/opencilk &&
-#             ${CMAKE_COMMAND} -P ${PATCH_SCRIPT} &&
-#             ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/tools/build
-#                 ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/opencilk
-#                 ${CMAKE_BINARY_DIR}/opencilk/install
-#         INSTALL_COMMAND ""
-#         BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/opencilk/install/bin/clang++
-#     )
-
-#     set(OPENCILK_INSTALL_DIR "${CMAKE_BINARY_DIR}/opencilk/install")
-#     set(OpenCilk_C_COMPILER "${OPENCILK_INSTALL_DIR}/bin/clang")
-#     set(OpenCilk_CXX_COMPILER "${OPENCILK_INSTALL_DIR}/bin/clang++")
 else()
     get_filename_component(OpenCilk_CXX_DIR ${OPENCILK_CLANG} DIRECTORY)
     get_filename_component(OPENCILK_INSTALL_DIR ${OpenCilk_CXX_DIR} DIRECTORY)
@@ -93,7 +89,7 @@ link_directories("${OPENCILK_INSTALL_DIR}/lib")
 
 # Add compiler flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -fopencilk")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
@@ -101,19 +97,29 @@ endif()
 # Include your own project headers
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+
+# --- Add OpenCilk options ---  
+target_compile_options(OpenCilkOptions INTERFACE -fopencilk)
+target_include_directories(OpenCilkOptions INTERFACE ${OPENCILK_INSTALL_DIR}/include)
+target_link_directories(OpenCilkOptions INTERFACE ${OPENCILK_INSTALL_DIR}/lib)
+
+
 # Executables
 add_executable(lis tests/test_lis.cpp)
 add_executable(lcs tests/test_lcs.cpp)
 
-target_compile_options(lis PRIVATE -fopencilk)
-target_include_directories(lis PRIVATE ${OPENCILK_INSTALL_DIR}/include)
-target_link_directories(lis PRIVATE ${OPENCILK_INSTALL_DIR}/lib)
+target_link_libraries(lis PRIVATE
+    OpenCilkOptions
+    OpenMP::OpenMP_CXX
+)
 
-target_compile_options(lcs PRIVATE -fopencilk)
-target_include_directories(lcs PRIVATE ${OPENCILK_INSTALL_DIR}/include)
-target_link_directories(lcs PRIVATE ${OPENCILK_INSTALL_DIR}/lib)
+target_link_libraries(lcs PRIVATE
+    OpenCilkOptions
+    OpenMP::OpenMP_CXX
+)
 
-# Code formatting
+
+# --- Code formatting ---
 find_program(CLANG_FORMAT "clang-format")
 if (CLANG_FORMAT)
     file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
