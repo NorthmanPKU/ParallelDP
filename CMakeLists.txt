@@ -108,6 +108,7 @@ target_link_directories(OpenCilkOptions INTERFACE ${OPENCILK_INSTALL_DIR}/lib)
 add_executable(lis tests/test_lis.cpp)
 add_executable(lcs tests/test_lcs.cpp)
 add_executable(glws tests/test_glws.cpp)
+add_executable(dsl tests/test_dsl.cpp)
 
 target_link_libraries(lis PRIVATE
     OpenCilkOptions
@@ -115,6 +116,11 @@ target_link_libraries(lis PRIVATE
 )
 
 target_link_libraries(lcs PRIVATE
+    OpenCilkOptions
+    OpenMP::OpenMP_CXX
+)
+
+target_link_libraries(dsl PRIVATE
     OpenCilkOptions
     OpenMP::OpenMP_CXX
 )
