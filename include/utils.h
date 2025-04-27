@@ -11,6 +11,7 @@
 enum class ParallelArch {
   CILK,
   OPENMP,
+  PARLAY,
   NONE
 };
 

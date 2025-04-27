@@ -3,7 +3,7 @@ set -e
 
 echo "Bootstrapping OpenCilk + project build..."
 
-
+# Install OpenCilk
 if [ ! -x build/opencilk/bin/clang++ ]; then
   echo "Building OpenCilk..."
 
@@ -27,11 +27,32 @@ else
   echo "OpenCilk already built"
 fi
 
+# Install Paralay
+if [ -d "build/parlay" ] || pkg-config --exists parlay; then
+  echo "Parlay already available"
+else
+  echo "Installing Parlay..."
+  # Clone Parlay repository
+  if [ ! -d "deps/parlay" ]; then
+    git clone https://github.com/cmuparlay/parlaylib.git deps/parlay
+  fi
+  
+  # Create build directory and install to local
+  mkdir -p deps/parlay/build
+  cd deps/parlay/build
+  cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$(pwd)/../../../build/parlay
+  cmake --build . --target install
+  cd ../../../
+  echo "Parlay installed to build/parlay"
+fi
+
+
 echo "Configuring with OpenCilk compiler..."
 cmake -B build -S . \
   -DCMAKE_C_COMPILER=$(pwd)/build/opencilk/bin/clang \
   -DCMAKE_CXX_COMPILER=$(pwd)/build/opencilk/bin/clang++ \
-  -DCMAKE_CXX_FLAGS="-fopencilk"
+  -DCMAKE_CXX_FLAGS="-fopencilk" \
+  -DCMAKE_PREFIX_PATH=$(pwd)/build/parlay
 
 echo "Building project..."
 cmake --build build

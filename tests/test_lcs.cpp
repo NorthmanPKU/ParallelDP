@@ -8,6 +8,9 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "parlay/sequence.h"
+
+
 void checkTest(const std::string &testName, int expected, int got) {
     if (expected != got) {
         std::cout << testName << " Fail: expected: " << expected << ", got " << got << std::endl;
@@ -17,6 +20,7 @@ void checkTest(const std::string &testName, int expected, int got) {
 }
 
 void testLCS(std::vector<std::vector<int>> &arrows, ParallelArch parallelArch, bool parallel, int granularity, int k) {
+    std::cout << "--------------------------------" << std::endl;
     LCS<int> lcs;
     auto start = std::chrono::high_resolution_clock::now();
     int length1 = lcs.compute_arrows(arrows, parallelArch, parallel, granularity);
@@ -26,17 +30,29 @@ void testLCS(std::vector<std::vector<int>> &arrows, ParallelArch parallelArch, b
 
     switch (parallelArch) {
         case ParallelArch::OPENMP:
-            std::cout << "OpenMP " << para << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+            // std::cout << "OpenMP " << para << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
             checkTest("OpenMP " + para + ": ", k, length1 - 1);
             break;
         case ParallelArch::CILK:
-            std::cout << "Cilk " << para << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+            // std::cout << "Cilk " << para << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
             checkTest("Cilk " + para + ": ", k, length1 - 1);
             break;
         default:
             std::cout << "Invalid parallel architecture" << std::endl;
             break;
     }
+    std::cout << "--------------------------------" << std::endl;
+}
+
+void testLCS_parlay(size_t n, const parlay::sequence<parlay::sequence<size_t>>& arrows, bool parallel, int granularity, int k) {
+    std::cout << "--------------------------------" << std::endl;
+    LCS<int> lcs;
+    auto start = std::chrono::high_resolution_clock::now();
+    int length1 = lcs.compute_arrows_paralay(n, arrows, parallel, granularity);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Parlay: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    checkTest("Parlay: ", k, length1);
+    std::cout << "--------------------------------" << std::endl;
 }
 
 void printUsage() {
@@ -94,6 +110,9 @@ int main(int argc, char* argv[]) {
         std::cout << "LCS generated." << std::endl;
 
         testLCS(arrows, ParallelArch::CILK, true, granularity, k);
+
+        auto arrows2 = MakeParlayData(n, m, k);
+        testLCS_parlay(n, arrows2, true, granularity, k);
         // testLCS(arrows, ParallelArch::CILK, true, granularity, k);
         // testLCS(arrows, ParallelArch::OPENMP, parallel, granularity, k);
         

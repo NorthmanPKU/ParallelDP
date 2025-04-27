@@ -1,0 +1,178 @@
+cmake_minimum_required(VERSION 3.16)
+project(ParallelDP VERSION 1.0 LANGUAGES CXX)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Find OpenMP
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
+include(ExternalProject)
+
+find_program(OPENCILK_CLANG clang
+    HINTS
+        ${CMAKE_BINARY_DIR}/opencilk/install/bin
+        $ENV{HOME}/.local/bin
+        /usr/local/bin
+        /opt/opencilk/bin
+)
+
+set(OPENCILK_FOUND FALSE)
+
+if(OPENCILK_CLANG)
+    execute_process(
+        COMMAND ${OPENCILK_CLANG} --version
+        OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    if(CLANG_VERSION_OUTPUT MATCHES "OpenCilk")
+        set(OPENCILK_FOUND TRUE)
+        message(STATUS "Found OpenCilk compiler at ${OPENCILK_CLANG}")
+    else()
+        message(STATUS "Found clang but it's not OpenCilk: ${OPENCILK_CLANG}")
+    endif()
+else()
+    message(STATUS "No clang found in preferred OpenCilk paths")
+endif()
+
+if(NOT OPENCILK_FOUND)
+    message(STATUS "Installing OpenCilk")
+    ExternalProject_Add(OpenCilk
+        PREFIX ${CMAKE_BINARY_DIR}/opencilk
+
+        GIT_REPOSITORY https://github.com/OpenCilk/infrastructure
+        GIT_TAG opencilk/v2.1
+
+        CONFIGURE_COMMAND ""  # no configure step needed
+
+        BUILD_COMMAND 
+            ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/tools/get 
+                ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/opencilk &&
+            ${CMAKE_COMMAND} -E echo "Patching OpenCilk build script to add openmp..." &&
+            ${CMAKE_COMMAND} -P ${CMAKE_BINARY_DIR}/patch_opencilk_build.cmake &&
+            ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/tools/build 
+                ${CMAKE_BINARY_DIR}/opencilk/src/OpenCilk/opencilk 
+                ${CMAKE_BINARY_DIR}/opencilk/install
+
+        INSTALL_COMMAND ""  # no separate install step
+        BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/opencilk/install/bin/clang++
+    )
+    set(OPENCILK_INSTALL_DIR "${CMAKE_BINARY_DIR}/opencilk/install")
+    # Create a toolchain-friendly variable
+    set(OpenCilk_C_COMPILER "${OPENCILK_INSTALL_DIR}/bin/clang")
+    set(OpenCilk_CXX_COMPILER "${OPENCILK_INSTALL_DIR}/bin/clang++")
+    set_property(GLOBAL PROPERTY USE_OPENCILK_EXTERNAL TRUE)
+else()
+    message(STATUS "OpenCilk already installed")
+    set(OpenCilk_C_COMPILER "${OPENCILK_CLANG}")
+    get_filename_component(OpenCilk_CXX_DIR ${OPENCILK_CLANG} DIRECTORY)
+    find_program(OpenCilk_CXX_COMPILER clang++ HINTS ${OpenCilk_CXX_DIR})
+
+    get_filename_component(OPENCILK_INSTALL_DIR ${OpenCilk_CXX_DIR} DIRECTORY)
+    set_property(GLOBAL PROPERTY USE_OPENCILK_EXTERNAL FALSE)
+endif()
+
+
+include_directories("${OPENCILK_INSTALL_DIR}/include")
+link_directories("${OPENCILK_INSTALL_DIR}/lib")
+
+
+# # Find OpenCilk
+# find_program(OPENCILK_CLANG clang
+#     HINTS
+#         $ENV{HOME}/install/opencilk
+#     PATHS
+#         /usr/local
+#         /usr
+#         /opt/opencilk
+# )
+
+# set(OPENCILK_FOUND FALSE)
+# if(OPENCILK_CLANG)
+#     execute_process(
+#         COMMAND ${OPENCILK_CLANG} --version
+#         OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+#         ERROR_QUIET
+#         OUTPUT_STRIP_TRAILING_WHITESPACE
+#     )
+    
+#     if(CLANG_VERSION_OUTPUT MATCHES "OpenCilk")
+#         set(OPENCILK_FOUND TRUE)
+#         get_filename_component(OPENCILK_BIN_DIR ${OPENCILK_CLANG} DIRECTORY)
+#         get_filename_component(OPENCILK_ROOT_DIR ${OPENCILK_BIN_DIR} DIRECTORY)
+        
+#         message(STATUS "OpenCilk found: ${OPENCILK_CLANG}")
+#         message(STATUS "OpenCilk root: ${OPENCILK_ROOT_DIR}")
+        
+#         set(CMAKE_C_COMPILER "${OPENCILK_CLANG}")
+#         find_program(OPENCILK_CLANGXX clang++ HINTS "${OPENCILK_BIN_DIR}" NO_DEFAULT_PATH)
+#         set(CMAKE_CXX_COMPILER "${OPENCILK_CLANGXX}")
+#         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopencilk")
+        
+#         set(OPENCILK_INCLUDE_DIR "${OPENCILK_ROOT_DIR}/include")
+#         if(EXISTS "${OPENCILK_INCLUDE_DIR}/cilk/cilk.h")
+#             include_directories("${OPENCILK_INCLUDE_DIR}")
+#             add_definitions(-DHAVE_OPENCILK=1)
+#         else()
+#             message(WARNING "OpenCilk headers not found at ${OPENCILK_INCLUDE_DIR}")
+#             set(OPENCILK_FOUND FALSE)
+#         endif()
+#     else()
+#         message(STATUS "Clang found but it's not OpenCilk: ${OPENCILK_CLANG}")
+#     endif()
+# endif()
+
+# if(NOT OPENCILK_FOUND)
+#     message(WARNING "OpenCilk not found, using default compiler")
+#     add_definitions(-DHAVE_OPENCILK=0)
+# endif()
+
+# Add compiler flags
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+endif()
+
+# Include directories
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# Create executables for LCS and LIS
+# add_executable(lcs tests/dp_tests/lcs_test.cpp)
+# add_executable(lis tests/dp_tests/lis_test.cpp)
+add_executable(lis tests/test_lis.cpp)
+add_executable(lcs tests/test_lcs.cpp)
+add_dependencies(lcs OpenCilk)
+add_dependencies(lis OpenCilk)
+
+target_compile_options(lis PRIVATE -fopencilk)
+target_include_directories(lis PRIVATE ${OPENCILK_INSTALL_DIR}/include)
+target_link_directories(lis PRIVATE ${OPENCILK_INSTALL_DIR}/lib)
+
+target_compile_options(lcs PRIVATE -fopencilk)
+target_include_directories(lcs PRIVATE ${OPENCILK_INSTALL_DIR}/include)
+target_link_directories(lcs PRIVATE ${OPENCILK_INSTALL_DIR}/lib)
+
+# Formatting
+find_program(CLANG_FORMAT "clang-format")
+
+if (CLANG_FORMAT)
+    file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
+        "${CMAKE_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_SOURCE_DIR}/include/*.h"
+    )
+
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT}
+        -i
+        -style=file
+        ${ALL_CXX_SOURCE_FILES}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Running clang-format on source files"
+    )
+endif()

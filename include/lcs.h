@@ -5,8 +5,25 @@
 #include "lis.h"
 #include "segment_tree.h"
 #include "segment_tree_cilk.h"
-#include "utils.h"
 #include <chrono>
+
+#include "parlay/internal/group_by.h"
+#include "parlay/parallel.h"
+#include "parlay/primitives.h"
+#include "utils.h"
+
+template <typename Left, typename Right>
+void conditional_par_do(bool parallel, Left left, Right right) {
+  if (parallel) {
+    parlay::parallel_do(left, right);
+  } else {
+    left();
+    right();
+  }
+}
+
+#define lc(x) ((x) << 1)
+#define rc(x) ((x) << 1 | 1)
 
 // Use the Cordon algorithm to solve the Longest Common Subsequence (LCS) problem,
 // supporting any data type T and user-defined comparison functions.
@@ -71,7 +88,7 @@ class LCS {
       throw std::invalid_argument("Invalid parallel architecture");
     }
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << ", Tree building time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    // std::cout << ", Tree building time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     
     int round = 0;
     while (tree->global_min() < std::numeric_limits<int>::max()) {
@@ -79,8 +96,78 @@ class LCS {
       tree->prefix_min();
     }
     auto end2 = std::chrono::high_resolution_clock::now();
-    std::cout << ", LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count();
+    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count() << "ms" << std::endl;
 
+    return round;
+  }
+
+  int compute_arrows_paralay(size_t n, const parlay::sequence<parlay::sequence<size_t>>& arrows, bool ifparallel=false, int granularity=5000) {
+    const size_t inf = std::numeric_limits<size_t>::max();
+    parlay::sequence<size_t> now(n + 1);
+
+    auto Read = [&](size_t i) {
+      if (now[i] >= arrows[i].size()) return inf;
+      return arrows[i][now[i]];
+    };
+
+    parlay::sequence<size_t> tree(4 * n);
+
+    std::function<void(size_t, size_t, size_t)> Construct =
+      [&](size_t x, size_t l, size_t r) {
+        if (l == r) {
+          tree[x] = Read(l);
+          return;
+        }
+        size_t mid = (l + r) / 2;
+        bool parallel = ifparallel && r - l > granularity;
+        conditional_par_do(
+            parallel, [&]() { Construct(lc(x), l, mid); },
+            [&]() { Construct(rc(x), mid + 1, r); });
+        tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
+      };
+
+      std::function<void(size_t, size_t, size_t, size_t)> PrefixMin =
+      [&](size_t x, size_t l, size_t r, size_t pre) {
+        if (tree[x] > pre) return;
+        if (l == r) {
+          auto& ys = arrows[l];
+          if (now[l] + 8 >= ys.size() || ys[now[l] + 8] > pre) {
+            while (now[l] < ys.size() && ys[now[l]] <= pre) {
+              now[l]++;
+            }
+          } else {
+            now[l] = std::upper_bound(ys.begin() + now[l], ys.end(), pre) -
+                     ys.begin();
+          }
+          tree[x] = Read(l);
+          return;
+        }
+        size_t mid = (l + r) / 2;
+        if (tree[x] == tree[rc(x)]) {
+          if (tree[lc(x)] <= pre && tree[lc(x)] < inf) {
+            bool parallel = ifparallel && r - l > granularity;
+            size_t lc_val = tree[lc(x)];
+            conditional_par_do(
+                parallel, [&]() { PrefixMin(lc(x), l, mid, pre); },
+                [&]() { PrefixMin(rc(x), mid + 1, r, lc_val); });
+          } else {
+            PrefixMin(rc(x), mid + 1, r, pre);
+          }
+        } else {
+          PrefixMin(lc(x), l, mid, pre);
+        }
+        tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
+      };
+
+    Construct(1, 1, n);
+    size_t round = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    while (tree[1] < inf) {
+      round++;
+      PrefixMin(1, 1, n, inf);
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
     return round;
   }
 
@@ -110,14 +197,7 @@ class LCS {
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "Prepare time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
               << std::endl;
-    // std::cout << "arrows: " << std::endl;
-    // for (int i = 0; i < n; i++) {
-    //   std::cout << "arrows[" << i << "]: ";
-    //   for (int j : arrows[i]) {
-    //     std::cout << j << " ";
-    //   }
-    //   std::cout << std::endl;
-    // }
+
     return compute_arrows(arrows, arch, parallel, granularity);
   }
 

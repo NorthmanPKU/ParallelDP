@@ -4,6 +4,34 @@ project(ParallelDP VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Check if Parlay is installed or exists as a subdirectory
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/parlay/CMakeLists.txt")
+  # Include as a subdirectory
+  add_subdirectory(deps/parlay)
+  set(PARLAY_FOUND TRUE)
+  set(PARLAY_TARGET "parlay")
+  message(STATUS "Using Parlay from deps/parlay subdirectory")
+else()
+  # Try to find Parlay using find_package
+  find_package(Parlay QUIET)
+  if(Parlay_FOUND)
+    message(STATUS "Found Parlay via find_package")
+  else()
+    message(STATUS "Parlay not found via find_package, checking for local installation")
+    # Check local installation
+    if(EXISTS "${CMAKE_BINARY_DIR}/parlay")
+      set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${CMAKE_BINARY_DIR}/parlay")
+      find_package(Parlay REQUIRED)
+      message(STATUS "Found Parlay in local build directory")
+    else()
+      message(FATAL_ERROR "Parlay not found. Please run install.sh first")
+    endif()
+  endif()
+endif()
+
+
+
+
 # Optional: Enable OpenMP when building OpenCilk
 set(OPENCILK_ENABLE_OPENMP ON)
 
@@ -113,16 +141,19 @@ add_executable(dsl tests/test_dsl.cpp)
 target_link_libraries(lis PRIVATE
     OpenCilkOptions
     OpenMP::OpenMP_CXX
+    ${PARLAY_TARGET}
 )
 
 target_link_libraries(lcs PRIVATE
     OpenCilkOptions
     OpenMP::OpenMP_CXX
+    ${PARLAY_TARGET}
 )
 
 target_link_libraries(dsl PRIVATE
     OpenCilkOptions
     OpenMP::OpenMP_CXX
+    ${PARLAY_TARGET}
 )
 
 
