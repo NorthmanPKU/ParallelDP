@@ -1,18 +1,91 @@
-# set(CMAKE_CXX_COMPILER /opt/homebrew/opt/llvm@14/bin/clang++)
-# set(CMAKE_CXX_STANDARD 20)
-
 cmake_minimum_required(VERSION 3.16)
 project(ParallelDP VERSION 1.0 LANGUAGES CXX)
 
-# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find OpenMP
+# Optional: Enable OpenMP when building OpenCilk
+set(OPENCILK_ENABLE_OPENMP ON)
+
+add_library(OpenCilkOptions INTERFACE)
+# --- Find OpenMP ---
+find_path(OpenMP_INCLUDE_DIR omp.h
+    PATHS
+        /usr/include
+        /usr/local/include
+        /usr/lib/gcc/x86_64-redhat-linux/8/include  # 根据您的系统路径调整
+)
+
+if(OpenMP_INCLUDE_DIR)
+    message(STATUS "Found OpenMP headers at: ${OpenMP_INCLUDE_DIR}")
+    include_directories(${OpenMP_INCLUDE_DIR})
+    
+    target_include_directories(OpenCilkOptions INTERFACE ${OpenMP_INCLUDE_DIR})
+else()
+    message(FATAL_ERROR "Could not find OpenMP headers (omp.h)")
+endif()
+
+set(OpenMP_CXX_FLAGS "-fopenmp")
+set(OpenMP_CXX_LIB_NAMES "gomp")  # 如果你使用的是 GNU OpenMP，可以改为 libomp
+set(OpenMP_gomp_LIBRARY "/usr/lib/gcc/x86_64-redhat-linux/8/libgomp.so")  # 根据你系统的 libgomp.so 路径调整
+
 find_package(OpenMP REQUIRED)
 if(OpenMP_CXX_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    message(STATUS "Found OpenMP and added to flags")
+else()
+    message(FATAL_ERROR "OpenMP not found, please ensure it is installed properly.")
 endif()
+
+
+
+# --- Try to find OpenCilk compiler installed locally ---
+include(ExternalProject)
+
+message(STATUS "CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
+message(STATUS "Looking for OpenCilk compiler at ${CMAKE_BINARY_DIR}/opencilk/bin")
+
+find_program(OPENCILK_CLANG clang
+    PATHS
+        ${CMAKE_BINARY_DIR}/opencilk/bin
+        # $ENV{HOME}/.local/bin
+        # /opt/opencilk/bin
+    NO_DEFAULT_PATH
+)
+
+message(STATUS "OPENCILK_CLANG: ${OPENCILK_CLANG}")
+
+set(OPENCILK_FOUND FALSE)
+
+if(OPENCILK_CLANG)
+    execute_process(
+        COMMAND ${OPENCILK_CLANG} --version
+        OUTPUT_VARIABLE CLANG_VERSION_OUTPUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    if(CLANG_VERSION_OUTPUT MATCHES "OpenCilk")
+        set(OPENCILK_FOUND TRUE)
+        message(STATUS "Found OpenCilk compiler at ${OPENCILK_CLANG}")
+    else()
+        message(STATUS "Found clang but it's not OpenCilk: ${OPENCILK_CLANG}")
+    endif()
+else()
+    message(STATUS "No clang found in preferred OpenCilk paths")
+endif()
+
+# --- If not found, build OpenCilk from source ---
+if(NOT OPENCILK_FOUND)
+    message(FATAL_ERROR "OpenCilk not found. Please run install.sh.")
+else()
+    get_filename_component(OpenCilk_CXX_DIR ${OPENCILK_CLANG} DIRECTORY)
+    get_filename_component(OPENCILK_INSTALL_DIR ${OpenCilk_CXX_DIR} DIRECTORY)
+    set(OpenCilk_C_COMPILER ${OPENCILK_CLANG})
+    find_program(OpenCilk_CXX_COMPILER clang++ HINTS ${OpenCilk_CXX_DIR})
+endif()
+
+include_directories("${OPENCILK_INSTALL_DIR}/include")
+link_directories("${OPENCILK_INSTALL_DIR}/lib")
 
 # Add compiler flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -21,72 +94,48 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
 
-# Include directories
+# Include your own project headers
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# # Create library for trees
-# add_library(tree_lib STATIC
-#     src/tree/segment_tree.cpp
-#     # Add other tree implementations if needed
-# )
 
-# add_library(problem_lib STATIC)
-
-# Set properties for libraries
-# set_target_properties(tree_lib PROPERTIES
-#     CXX_STANDARD 17
-#     CXX_STANDARD_REQUIRED ON
-#     POSITION_INDEPENDENT_CODE ON
-# )
-
-# Link OpenMP to library
-# target_link_libraries(tree_lib PUBLIC OpenMP::OpenMP_CXX)
-
-# Create executables for LCS and LIS
-add_executable(lcs tests/dp_tests/lcs_test.cpp)
-add_executable(lis tests/dp_tests/lis_test.cpp)
-add_executable(lisjc tests/test_lis.cpp)
-add_executable(lcsjc tests/test_lcs.cpp)
-# add_executable(lis tests/dp_tests/lis_test.cpp)
-
-# Link libraries to executables
-# target_link_libraries(lcs OpenMP::OpenMP_CXX problem_lib)
-# target_link_libraries(lis OpenMP::OpenMP_CXX problem_lib)
-# target_link_libraries(lisjc OpenMP::OpenMP_CXX problem_lib)
-# target_link_libraries(lcsjc OpenMP::OpenMP_CXX problem_lib)
-
-# Main executable
-# add_executable(parallel_dp_test test.cpp)
-# target_link_libraries(parallel_dp_test tree_lib)
-
-# Tests
-# enable_testing()
-
-# Tree tests
-# add_executable(tree_test tests/tree_tests/tree_test.cpp)
-# target_link_libraries(tree_test tree_lib)
-# add_test(NAME TreeTest COMMAND tree_test)
-
-# add_executable(segment_tree_test tests/tree_tests/segment_tree.cpp)
-# target_link_libraries(segment_tree_test tree_lib)
-# add_test(NAME SegmentTreeTest COMMAND segment_tree_test)
+# --- Add OpenCilk options ---  
+target_compile_options(OpenCilkOptions INTERFACE -fopencilk)
+target_include_directories(OpenCilkOptions INTERFACE ${OPENCILK_INSTALL_DIR}/include)
+target_link_directories(OpenCilkOptions INTERFACE ${OPENCILK_INSTALL_DIR}/lib)
 
 
+# Executables
+add_executable(lis tests/test_lis.cpp)
+add_executable(lcs tests/test_lcs.cpp)
+add_executable(glws tests/test_glws.cpp)
+add_executable(dsl tests/test_dsl.cpp)
 
+target_link_libraries(lis PRIVATE
+    OpenCilkOptions
+    OpenMP::OpenMP_CXX
+)
+
+target_link_libraries(lcs PRIVATE
+    OpenCilkOptions
+    OpenMP::OpenMP_CXX
+)
+
+target_link_libraries(dsl PRIVATE
+    OpenCilkOptions
+    OpenMP::OpenMP_CXX
+)
+
+
+# --- Code formatting ---
 find_program(CLANG_FORMAT "clang-format")
-
 if (CLANG_FORMAT)
     file(GLOB_RECURSE ALL_CXX_SOURCE_FILES
         "${CMAKE_SOURCE_DIR}/src/*.cpp"
         "${CMAKE_SOURCE_DIR}/include/*.h"
     )
-
     add_custom_target(format
         COMMAND ${CLANG_FORMAT}
-        -i
-        -style=file
-        ${ALL_CXX_SOURCE_FILES}
+        -i -style=file ${ALL_CXX_SOURCE_FILES}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Running clang-format on source files"
-    )
+        COMMENT "Running clang-format on source files")
 endif()

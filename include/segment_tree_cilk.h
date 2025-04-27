@@ -1,8 +1,8 @@
 #pragma once
 
-#include <omp.h>
+#include <cilk/cilk.h>
+#include <cilk/cilk_api.h>
 #include <algorithm>
-#include <atomic>
 #include <cassert>
 #include <functional>
 #include <iostream>
@@ -26,7 +26,7 @@
  * @tparam T The data type stored in the segment tree (must support comparison)
  */
 template <typename T>
-class SegmentTreeOpenMP : public Tree<T> {
+class SegmentTreeCilk : public Tree<T> {
  private:
   std::vector<T> tree;       // The segment tree array
   size_t n;                  // Number of leaf nodes
@@ -39,8 +39,6 @@ class SegmentTreeOpenMP : public Tree<T> {
   std::vector<std::vector<T>> arrows;
   int granularity = 1000;
   bool parallel = false;
-
-  // std::atomic<int> task_count{0};
 
   /**
    * @brief Get the index of the left child of a node
@@ -70,8 +68,6 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @param x Current node index in the segment tree
    * @param l Left boundary of the current segment
    * @param r Right boundary of the current segment
-   * @param parallel Whether to build the tree in parallel
-   * @param granularity The minimum size of a subtree to process in parallel
    */
   void build_recursive(const std::vector<T> &arr, size_t x, size_t l, size_t r) {
     if (l == r) {
@@ -83,11 +79,9 @@ class SegmentTreeOpenMP : public Tree<T> {
     bool do_parallel = parallel && (r - l > granularity);
 
     if (do_parallel) {
-#pragma omp task shared(arr, tree)
-      { build_recursive(arr, lc(x), l, mid); }
-#pragma omp task shared(arr, tree)
-      { build_recursive(arr, rc(x), mid + 1, r); }
-#pragma omp taskwait
+      cilk_spawn build_recursive(arr, lc(x), l, mid);
+      build_recursive(arr, rc(x), mid + 1, r);
+      cilk_sync;
     } else {
       build_recursive(arr, lc(x), l, mid);
       build_recursive(arr, rc(x), mid + 1, r);
@@ -135,8 +129,6 @@ class SegmentTreeOpenMP : public Tree<T> {
    */
   void update_recursive(size_t x, size_t l, size_t r, size_t pos, T new_val) {
     // If we've reached the leaf node
-    // std::cout << "update_recursive: x = " << x << ", l = " << l << ", r = " << r << ", pos = " << pos << ", new_val =
-    // " << new_val << std::endl;
     if (l == r) {
       tree[x] = new_val;
       return;
@@ -150,8 +142,6 @@ class SegmentTreeOpenMP : public Tree<T> {
     }
 
     tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
-    // std::cout << "update_recursive: tree[x] = " << tree[x] << std::endl;
-    // std::cout << "left_child: " << tree[lc(x)] << ", right_child: " << tree[rc(x)] << std::endl;
   }
 
   /**
@@ -161,14 +151,9 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @param l Left boundary of the current segment
    * @param r Right boundary of the current segment
    * @param pre The prefix value
-   * @param arrows The array of arrow sequences
-   * @param now The current indices in the arrow sequences
-   * @param parallel Whether to perform the operation in parallel
-   * @param granularity The minimum size of a subtree to process in parallel
    */
   void prefix_min_recursive(size_t x, size_t l, size_t r, T pre) {
     // Early return if this node's value is already greater than pre
-    // std::cout << "prefix_min_recursive: x = " << x << ", l = " << l << ", r = " << r << ", pre = " << pre;
     if (tree[x] > pre) {
       return;
     }
@@ -202,28 +187,17 @@ class SegmentTreeOpenMP : public Tree<T> {
         T lc_val = tree[lc(x)];
 
         if (do_parallel) {
-          // task_count.fetch_add(1);
-          // std::cout << "do_parallel" << std::endl;
-          // #pragma omp single
-          // {
-          //   printf("Current working threads: %d\n", omp_get_num_threads());
-          // }
-#pragma omp task
-          { prefix_min_recursive(lc(x), l, mid, pre); }
-          // #pragma omp task
-          { prefix_min_recursive(rc(x), mid + 1, r, lc_val); }
-#pragma omp taskwait
+          cilk_spawn prefix_min_recursive(lc(x), l, mid, pre);
+          prefix_min_recursive(rc(x), mid + 1, r, lc_val);
+          cilk_sync;
         } else {
-          // std::cout << "do_not_parallel: " << "l: " << l << ", mid: " << mid << ", r: " << r << std::endl;
           prefix_min_recursive(lc(x), l, mid, pre);
           prefix_min_recursive(rc(x), mid + 1, r, lc_val);
         }
       } else {
-        // std::cout << "only right" << std::endl;
         prefix_min_recursive(rc(x), mid + 1, r, pre);
       }
     } else {
-      // std::cout << "only left" << std::endl;
       prefix_min_recursive(lc(x), l, mid, pre);
     }
 
@@ -238,14 +212,10 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @param arr The input array to build the tree from
    * @param inf_value The value to use as infinity (default: maximum value of type T)
    */
-  SegmentTreeOpenMP(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
+  SegmentTreeCilk(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
               size_t granularity = 1000)
       : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
     std::cout << "SegmentTree init" << std::endl;
-    // std::cout << "arr: " << std::endl;
-    // for (size_t i = 0; i < arr.size(); ++i) {
-    //   std::cout << arr[i] << " ";
-    // }
     std::cout << std::endl;
     std::cout << "inf_value: " << inf_value << std::endl;
     std::cout << "parallel: " << parallel << std::endl;
@@ -257,7 +227,8 @@ class SegmentTreeOpenMP : public Tree<T> {
       // TODO: A current workaround for string comparison
       infinity = "zzzzzzzzzzzzzzzzzzzz";
     }
-    tree.resize(4 * n, inf_value);
+    // tree.resize(4 * n, inf_value);
+    tree.resize(4 * n);
     build(arr);
   }
 
@@ -269,14 +240,9 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @param parallel Whether to build the tree in parallel
    * @param granularity The minimum size of a subtree to process in parallel
    */
-  SegmentTreeOpenMP(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
+  SegmentTreeCilk(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
               size_t _granularity = 1000)
-      : n(_arrows.size()),
-        infinity(inf_value),
-        arrows(_arrows),
-        prefix_mode(true),
-        granularity(_granularity),
-        parallel(_parallel) {
+      : n(_arrows.size()), infinity(inf_value), arrows(_arrows), prefix_mode(true), granularity(_granularity), parallel(_parallel) {
     std::cout << "SegmentTree Prefix mode init" << std::endl;
     std::cout << "inf_value: " << inf_value << std::endl;
     std::cout << "parallel: " << parallel << std::endl;
@@ -285,7 +251,8 @@ class SegmentTreeOpenMP : public Tree<T> {
       // TODO: A current workaround for string comparison
       infinity = "zzzzzzzzzzzzzzzzzzzz";
     }
-    tree.resize(4 * n, inf_value);
+    // tree.resize(4 * n, inf_value);
+    tree.resize(4 * n);
     now.resize(n, 0);
     std::vector<T> arr(n);
     for (size_t i = 0; i < n; ++i) {
@@ -408,8 +375,6 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @brief Build the segment tree from an array
    *
    * @param arr The input array to build the tree from
-   * @param parallel Whether to build the tree in parallel
-   * @param granularity The minimum size of a subtree to process in parallel
    * @throws std::invalid_argument if the array is empty
    */
   void build(const std::vector<T> &arr) {
@@ -421,15 +386,9 @@ class SegmentTreeOpenMP : public Tree<T> {
       throw std::invalid_argument("Input array size exceeds segment tree capacity");
     }
 
-    if (parallel) {
-#pragma omp parallel
-      {
-#pragma omp single nowait
-        { build_recursive(arr, 0, 0, n - 1); }
-      }
-    } else {
-      build_recursive(arr, 0, 0, n - 1);
-    }
+    // In OpenCilk, we don't need a special wrapper for parallelism
+    // Just call the recursive function directly
+    build_recursive(arr, 0, 0, n - 1);
 
     constructed = true;
   }
@@ -467,26 +426,25 @@ class SegmentTreeOpenMP : public Tree<T> {
       throw std::runtime_error("Segment tree has not been constructed");
     }
 
-    // return find_min_index_recursive(0, 0, n - 1);
     size_t node_idx = 0;
     size_t left = 0;
     size_t right = n - 1;
-
+    
     while (left < right) {
-      size_t mid = (left + right) / 2;
-
-      T left_min = tree[lc(node_idx)];
-      T right_min = tree[rc(node_idx)];
-
-      if (left_min <= right_min) {
-        node_idx = lc(node_idx);
-        right = mid;
-      } else {
-        node_idx = rc(node_idx);
-        left = mid + 1;
-      }
+        size_t mid = (left + right) / 2;
+        
+        T left_min = tree[lc(node_idx)];
+        T right_min = tree[rc(node_idx)];
+        
+        if (left_min <= right_min) {
+            node_idx = lc(node_idx);
+            right = mid;
+        } else {
+            node_idx = rc(node_idx);
+            left = mid + 1;
+        }
     }
-
+    
     return left;
   }
 
@@ -515,11 +473,6 @@ class SegmentTreeOpenMP : public Tree<T> {
    *
    * Updates the segment tree based on prefix minimum values from arrow sequences.
    *
-   * @param pre The prefix value
-   * @param arrows The array of arrow sequences
-   * @param now The current indices in the arrow sequences
-   * @param parallel Whether to perform the operation in parallel
-   * @param granularity The minimum size of a subtree to process in parallel
    * @throws std::invalid_argument if the arrow sequences or now indices are invalid
    * @throws std::runtime_error if the tree has not been constructed
    */
@@ -547,29 +500,20 @@ class SegmentTreeOpenMP : public Tree<T> {
       }
     }
 
-    if (parallel) {
-#pragma omp parallel
-      {
-#pragma omp single nowait
-        { prefix_min_recursive(0, 0, n - 1, infinity); }
-      }
-    } else {
-      prefix_min_recursive(0, 0, n - 1, infinity);
-    }
-    // std::cout << "Task count: " << task_count.load() << std::endl;
+    // In OpenCilk, we don't need a special wrapper for parallelism
+    // Just call the recursive function directly
+    prefix_min_recursive(0, 0, n - 1, infinity);
   }
 
   /**
    * @brief Function to simulate the Read lambda function for LCS prefix minimum operation
    *
    * @param i Index to read from
-   * @param arrows The array of arrow sequences
-   * @param now The current indices in the arrow sequences
    * @return The value at position i in arrows[i], or infinity if out of bounds
    */
   T read(size_t i) {
     if (!prefix_mode) {
-      throw std::runtime_error("This is not Prefix mode");
+        throw std::runtime_error("This is not Prefix mode");
     }
     if (now[i] >= arrows[i].size()) {
       return std::numeric_limits<T>::max();  // Return infinity
@@ -602,9 +546,9 @@ class SegmentTreeOpenMP : public Tree<T> {
   }
 };
 
-template class SegmentTreeOpenMP<int>;
-template class SegmentTreeOpenMP<float>;
-template class SegmentTreeOpenMP<double>;
-template class SegmentTreeOpenMP<long>;
-template class SegmentTreeOpenMP<std::string>;
-template class SegmentTreeOpenMP<std::pair<int, int>>;
+template class SegmentTreeCilk<int>;
+template class SegmentTreeCilk<float>;
+template class SegmentTreeCilk<double>;
+template class SegmentTreeCilk<long>;
+template class SegmentTreeCilk<std::string>;
+template class SegmentTreeCilk<std::pair<int, int>>;
