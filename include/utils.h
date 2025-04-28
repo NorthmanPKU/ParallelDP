@@ -12,6 +12,7 @@ enum class ParallelArch {
   CILK,
   OPENMP,
   PARLAY,
+  CILK_OPT,
   NONE
 };
 
@@ -42,17 +43,13 @@ void get_existing_arrows(int n, int m, int lcs_length, std::vector<std::vector<i
       "arrow_" + std::to_string(n) + "_" + std::to_string(m) + "_" + std::to_string(lcs_length) + ".txt";
   std::ifstream file(filename);
   if (file.is_open()) {
-    // 清空并预分配空间
     arrows.clear();
     arrows.resize(n);
-
-    // 逐行读取
     std::string line;
     int i = 0;
     while (std::getline(file, line) && i < n) {
       std::istringstream iss(line);
       int value;
-      // 读取该行的所有整数
       while (iss >> value) {
         arrows[i].push_back(value);
       }
@@ -113,7 +110,6 @@ void get_arrows(const std::vector<T> &data1, const std::vector<T> &data2, int lc
 }
 
 void generateLCS(int length1, int length2, int lcsLength, std::vector<std::vector<int>> &arrows) {
-  // 参数验证
   if (lcsLength > std::min(length1, length2)) {
     std::cerr << "Error: LCS length cannot be greater than the minimum of the two array lengths" << std::endl;
     exit(1);
@@ -130,14 +126,10 @@ void generateLCS(int length1, int length2, int lcsLength, std::vector<std::vecto
     return;
   }
 
-  // std::string filename = "lcs_data_" + std::to_string(length1) + "_" + std::to_string(length2) + "_" +
-  // std::to_string(lcsLength) + ".txt"; std::ifstream file(filename);
-  // // 使用占位符值初始化序列
   std::vector<int> seq1(length1, -1);
   std::vector<int> seq2(length2, -1);
   // if (file.is_open()) {
   //     std::string line, temp;
-  //     // 读取第一个序列
   //     std::getline(file, line);
   //     std::istringstream iss1(line.substr(line.find(":") + 1));
   //     seq1.clear();
@@ -145,7 +137,6 @@ void generateLCS(int length1, int length2, int lcsLength, std::vector<std::vecto
   //         seq1.push_back(std::stoi(temp));
   //     }
 
-  //     // 读取第二个序列
   //     std::getline(file, line);
   //     std::istringstream iss2(line.substr(line.find(":") + 1));
   //     seq2.clear();
@@ -161,41 +152,33 @@ void generateLCS(int length1, int length2, int lcsLength, std::vector<std::vecto
   std::random_device rd;
   std::mt19937 gen(rd());
 
-  // 创建一个拥有不同值的公共子序列
   std::vector<int> lcsValues(lcsLength);
   for (int i = 0; i < lcsLength; i++) {
-    lcsValues[i] = (i + 1) * 100;  // 使用间隔较大的值
+    lcsValues[i] = (i + 1) * 100;
   }
 
-  // 为两个序列中的公共元素创建位置
-  // 这些位置将是严格递增的，以保持子序列关系
+
   std::vector<int> pos1, pos2;
 
-  // 为序列1选择lcsLength个位置
   for (int i = 0; i < lcsLength; i++) {
-    // 确保位置递增
     int minPos = (i > 0) ? pos1.back() + 1 : 0;
     int maxPos = length1 - (lcsLength - i - 1) - 1;
     std::uniform_int_distribution<int> dist(minPos, maxPos);
     pos1.push_back(dist(gen));
   }
 
-  // 为序列2选择lcsLength个位置
   for (int i = 0; i < lcsLength; i++) {
-    // 确保位置递增
     int minPos = (i > 0) ? pos2.back() + 1 : 0;
     int maxPos = length2 - (lcsLength - i - 1) - 1;
     std::uniform_int_distribution<int> dist(minPos, maxPos);
     pos2.push_back(dist(gen));
   }
 
-  // 在选定的位置放置公共元素
   for (int i = 0; i < lcsLength; i++) {
     seq1[pos1[i]] = lcsValues[i];
     seq2[pos2[i]] = lcsValues[i];
   }
 
-  // 用唯一值填充剩余位置
   std::uniform_int_distribution<int> uniqueDist1(1, length1);
   std::uniform_int_distribution<int> uniqueDist2(length2, length2 * 2);
 
@@ -303,9 +286,9 @@ int lcs_dp_naive(const std::vector<T> &seq1, const std::vector<T> &seq2) {
   std::vector<int> dp(n + 1, 0);
 
   for (int i = 1; i <= m; i++) {
-    int prev = 0;  // 存储dp[i-1][j-1]的值
+    int prev = 0;
     for (int j = 1; j <= n; j++) {
-      int temp = dp[j];  // 暂存当前的dp[j]，它将成为下一轮的dp[i-1][j-1]
+      int temp = dp[j];
       if (seq1[i - 1] == seq2[j - 1]) {
         dp[j] = prev + 1;
       } else {

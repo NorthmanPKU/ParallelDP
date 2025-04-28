@@ -15,6 +15,8 @@
 
 #include "tree.h"
 #include "utils.h"
+#include "parlay/sequence.h"
+#include "parlay/parallel.h"
 
 /**
  * @brief A comprehensive segment tree implementation supporting both sequential and parallel builds.
@@ -26,17 +28,17 @@
  * @tparam T The data type stored in the segment tree (must support comparison)
  */
 template <typename T>
-class SegmentTreeCilk : public Tree<T> {
+class SegmentTreeCilkOpt : public Tree<T> {
  private:
-  std::vector<T> tree;       // The segment tree array
   size_t n;                  // Number of leaf nodes
   T infinity;                // Value representing infinity
   bool constructed = false;  // Flag to track if tree has been constructed
 
   // For LCS prefix minimum operation
   bool prefix_mode = false;
-  std::vector<size_t> now;
-  std::vector<std::vector<T>> arrows;
+  parlay::sequence<T> tree;
+  parlay::sequence<size_t> now;
+  parlay::sequence<parlay::sequence<T>> arrows;
   int granularity = 1000;
   bool parallel = false;
 
@@ -69,9 +71,9 @@ class SegmentTreeCilk : public Tree<T> {
    * @param l Left boundary of the current segment
    * @param r Right boundary of the current segment
    */
-  void build_recursive(const std::vector<T> &arr, size_t x, size_t l, size_t r) {
+  void build_recursive(size_t x, size_t l, size_t r) {
     if (l == r) {
-      tree[x] = (l < arr.size()) ? arr[l] : infinity;
+      tree[x] = read(l);
       return;
     }
 
@@ -79,12 +81,12 @@ class SegmentTreeCilk : public Tree<T> {
     bool do_parallel = parallel && (r - l > granularity);
 
     if (do_parallel) {
-      cilk_spawn build_recursive(arr, lc(x), l, mid);
-      build_recursive(arr, rc(x), mid + 1, r);
+      cilk_spawn build_recursive(lc(x), l, mid);
+      build_recursive(rc(x), mid + 1, r);
       cilk_sync;
     } else {
-      build_recursive(arr, lc(x), l, mid);
-      build_recursive(arr, rc(x), mid + 1, r);
+      build_recursive(lc(x), l, mid);
+      build_recursive(rc(x), mid + 1, r);
     }
 
     tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
@@ -187,9 +189,13 @@ class SegmentTreeCilk : public Tree<T> {
         T lc_val = tree[lc(x)];
 
         if (do_parallel) {
-          cilk_spawn prefix_min_recursive(lc(x), l, mid, pre);
-          prefix_min_recursive(rc(x), mid + 1, r, lc_val);
-          cilk_sync;
+          // cilk_spawn prefix_min_recursive(lc(x), l, mid, pre);
+          // prefix_min_recursive(rc(x), mid + 1, r, lc_val);
+          parlay::parallel_do(
+            [&]() { prefix_min_recursive(lc(x), l, mid, pre); },
+            [&]() { prefix_min_recursive(rc(x), mid + 1, r, lc_val); }
+          );
+          // cilk_sync;
         } else {
           prefix_min_recursive(lc(x), l, mid, pre);
           prefix_min_recursive(rc(x), mid + 1, r, lc_val);
@@ -206,43 +212,10 @@ class SegmentTreeCilk : public Tree<T> {
   }
 
  public:
-  /**
-   * @brief Construct a new Segment Tree object based on an array
-   *
-   * @param arr The input array to build the tree from
-   * @param inf_value The value to use as infinity (default: maximum value of type T)
-   */
-  SegmentTreeCilk(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
-              size_t granularity = 1000)
-      : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
-    std::cout << "SegmentTree init" << std::endl;
-    std::cout << std::endl;
-    std::cout << "inf_value: " << inf_value << std::endl;
-    std::cout << "parallel: " << parallel << std::endl;
-    std::cout << "granularity: " << granularity << std::endl;
-    if (arr.empty()) {
-      throw std::invalid_argument("Input array cannot be empty");
-    }
-    if constexpr (std::is_same_v<T, std::string>) {
-      // TODO: A current workaround for string comparison
-      infinity = "zzzzzzzzzzzzzzzzzzzz";
-    }
-    tree.resize(4 * n, inf_value);
-    build(arr);
-  }
-
-  /**
-   * @brief Construct a new Segment Tree for LCS prefix minimum operation
-   *
-   * @param _arrows The input array of arrow sequences
-   * @param inf_value The value to use as infinity (default: maximum value of type T)
-   * @param parallel Whether to build the tree in parallel
-   * @param granularity The minimum size of a subtree to process in parallel
-   */
-  SegmentTreeCilk(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
+  SegmentTreeCilkOpt(parlay::sequence<parlay::sequence<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
               size_t _granularity = 1000)
       : n(_arrows.size()), infinity(inf_value), arrows(_arrows), prefix_mode(true), granularity(_granularity), parallel(_parallel) {
-    std::cout << "SegmentTree Prefix mode init" << std::endl;
+    std::cout << "SegmentTreeCilkOpt init" << std::endl;
     std::cout << "inf_value: " << inf_value << std::endl;
     std::cout << "parallel: " << parallel << std::endl;
     std::cout << "granularity: " << granularity << std::endl;
@@ -250,13 +223,16 @@ class SegmentTreeCilk : public Tree<T> {
       // TODO: A current workaround for string comparison
       infinity = "zzzzzzzzzzzzzzzzzzzz";
     }
-    tree.resize(4 * n, inf_value);
+    // tree.resize(4 * n, inf_value);
+    tree.resize(4 * n);
     now.resize(n, 0);
-    std::vector<T> arr(n);
-    for (size_t i = 0; i < n; ++i) {
-      arr[i] = read(i);
-    }
-    build(arr);
+    // std::vector<T> arr(n);
+    // for (size_t i = 0; i < n; ++i) {
+    //   arr[i] = read(i);
+    // }
+    // build();
+    build_recursive(0, 0, n - 1);
+    constructed = true;
   }
 
   /**
@@ -362,34 +338,6 @@ class SegmentTreeCilk : public Tree<T> {
     return tree[0];
   }
 
-  /**
-   * @brief Get the raw tree array
-   *
-   * @return A const reference to the tree array
-   */
-  const std::vector<T> &get_tree() const { return tree; }
-
-  /**
-   * @brief Build the segment tree from an array
-   *
-   * @param arr The input array to build the tree from
-   * @throws std::invalid_argument if the array is empty
-   */
-  void build(const std::vector<T> &arr) {
-    if (arr.empty()) {
-      throw std::invalid_argument("Input array cannot be empty");
-    }
-
-    if (arr.size() > n) {
-      throw std::invalid_argument("Input array size exceeds segment tree capacity");
-    }
-
-    // In OpenCilk, we don't need a special wrapper for parallelism
-    // Just call the recursive function directly
-    build_recursive(arr, 0, 0, n - 1);
-
-    constructed = true;
-  }
 
   /**
    * @brief Query the minimum value in a range
@@ -509,10 +457,7 @@ class SegmentTreeCilk : public Tree<T> {
    * @param i Index to read from
    * @return The value at position i in arrows[i], or infinity if out of bounds
    */
-  T read(size_t i) {
-    if (!prefix_mode) {
-        throw std::runtime_error("This is not Prefix mode");
-    }
+  __inline__ T read(size_t i) {
     if (now[i] >= arrows[i].size()) {
       return std::numeric_limits<T>::max();  // Return infinity
     }
@@ -544,9 +489,9 @@ class SegmentTreeCilk : public Tree<T> {
   }
 };
 
-template class SegmentTreeCilk<int>;
-template class SegmentTreeCilk<float>;
-template class SegmentTreeCilk<double>;
-template class SegmentTreeCilk<long>;
-template class SegmentTreeCilk<std::string>;
-template class SegmentTreeCilk<std::pair<int, int>>;
+template class SegmentTreeCilkOpt<int>;
+template class SegmentTreeCilkOpt<float>;
+template class SegmentTreeCilkOpt<double>;
+template class SegmentTreeCilkOpt<long>;
+template class SegmentTreeCilkOpt<std::string>;
+template class SegmentTreeCilkOpt<std::pair<int, int>>;

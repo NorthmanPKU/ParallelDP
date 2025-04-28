@@ -15,7 +15,7 @@ int main() {
         .withSequence(Seq)
         .withCondition(dp_dsl::max(Status(J) + 1, Status(I)))
         .build();
-    // // Let the system recognize the problem type
+    // Let the system recognize the problem type
     ProblemType type = problem1.getProblemType();
     std::cout << "Detected problem type: " << 
         (type == ProblemType::LIS ? "LIS" : 
@@ -24,7 +24,7 @@ int main() {
         << std::endl;
     
 
-
+    // Example 2: Defining LCS problem using builder pattern
     auto Seq1 = new Sequence<int>({1, 2, 3, 4, 5});
     auto Seq2 = new Sequence<int>({3, 1, 4, 2, 5});
     auto I2 = new IndVar(0, 5);
@@ -40,6 +40,7 @@ int main() {
                     dp_dsl::max(Status(I2, minus(J2, 1)), Status(minus(I2, 1), J2)))
         .build();
     
+    // Let the system recognize the problem type
     ProblemType type2 = problem2.getProblemType();
     std::cout << "Detected problem type: " << 
         (type2 == ProblemType::LIS ? "LIS" : 

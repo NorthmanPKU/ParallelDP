@@ -11,6 +11,7 @@
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
 #include "utils.h"
+#include "segment_tree_cilk_opt.h"
 
 template <typename Left, typename Right>
 void conditional_par_do(bool parallel, Left left, Right right) {
@@ -31,6 +32,7 @@ template <typename T, typename Compare = std::less<T>>
 class LCS {
   private:
     std::unique_ptr<Tree<int>> tree;
+    std::unique_ptr<SegmentTreeCilkOpt<size_t>> tree_opt;
  public:
 
   /**
@@ -168,6 +170,24 @@ class LCS {
     }
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    return round;
+  }
+
+  int compute_arrows_opt(const parlay::sequence<parlay::sequence<size_t>>& arrows, bool ifparallel=false, int granularity=5000) {
+    auto start = std::chrono::high_resolution_clock::now();
+    tree_opt = std::make_unique<SegmentTreeCilkOpt<size_t>>(arrows, std::numeric_limits<size_t>::max(), ifparallel, granularity);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Prepare time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
+              << std::endl;
+
+    int round = 0;
+    while (tree_opt->global_min() < std::numeric_limits<int>::max()) {
+      round++;
+      tree_opt->prefix_min();
+    }
+    auto end2 = std::chrono::high_resolution_clock::now();
+    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count() << "ms" << std::endl;
+
     return round;
   }
 
