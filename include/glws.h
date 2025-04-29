@@ -35,16 +35,8 @@ class ConvexGLWS {
         int b = findBest(i, B);
         D[i] = D[b] + costFunc(b, i, pos);
       }
-      printf("now: %d\n", now);
-      printf("Cordon: %d\n", cordon);
       updateBest(now, cordon, n, D, B, costFunc, cmp, pos);
-      std::cout << "D: ";
-      for (const auto &d : D) {
-        std::cout << d << " ";
-      }
-      std::cout << std::endl;
       now = cordon - 1;
-      printf("------------------------\n");
     }
 
     return D[n];
@@ -58,29 +50,22 @@ class ConvexGLWS {
     for (int t = 1; (now + (1 << t)) <= n; ++t) {
       int l = now + (1 << (t - 1));
       int r = std::min(n, now + (1 << t) - 1);
-      printf("l: %d, r: %d\n", l, r);
       std::vector<int> s_j(r - l + 1, n + 1);
-      // #pragma omp parallel for schedule(dynamic)
+      const int CACHE_LINE = 64 / sizeof(int);
+#pragma omp parallel for schedule(dynamic, CACHE_LINE) firstprivate(D, B, costFunc, cmp, data)
       for (int j = l; j <= r; ++j) {
         int bestj = findBest(j, B);
-        printf("j: %d, bestj: %d\n", j, bestj);
         T Ej = D[bestj] + costFunc(bestj, j, data);
         T Dj = Ej;
         if (cmp(Dj, D[j])) {
-          printf("Updating D[%d]: %Lf\n", j, Dj);
           // Relax j
           // Now find the earliest state i > j s.t. j can relax i better than its current best
           for (int i = j + 1; i <= n; ++i) {
             int current_best = findBest(i, B);
             T current_val = D[current_best] + costFunc(current_best, i, data);
             T candidate_val = Dj + costFunc(j, i, data);
-            std::cout << "D[current_best]: " << D[current_best]
-                      << " + costFunc(current_best, j, data): " << costFunc(current_best, j, data) << std::endl;
-            std::cout << "Dj: " << Dj << " + costFunc(j, i, data): " << costFunc(j, i, data) << std::endl;
             if (cmp(candidate_val, current_val)) {
-#pragma omp critical
-              { s_j[j - l] = i; }
-              printf("Relaxing j: %d, i: %d\n", j, i);
+              s_j[j - l] = i;
               break;
             }
           }
@@ -115,11 +100,6 @@ class ConvexGLWS {
       }
     }
     B = compact;
-    std::cout << "B after updateBest: ";
-    for (const auto &interval : B) {
-      std::cout << "[" << interval.l << "," << interval.r << "]→" << interval.j << " ";
-    }
-    std::cout << std::endl;
   }
 
   std::vector<Interval> findIntervals(int jl, int jr, int il, int ir, const std::vector<T> &D,
@@ -150,8 +130,19 @@ class ConvexGLWS {
         best = j;
       }
     }
-    auto L = findIntervals(jl, best, il, im - 1, D, costFunc, cmp, data);
-    auto R = findIntervals(best, jr, im + 1, ir, D, costFunc, cmp, data);
+
+    std::vector<Interval> L, R;
+    if (ir - il > 1000) {
+#pragma omp task shared(L)
+      { L = findIntervals(jl, best, il, im - 1, D, costFunc, cmp, data); }
+#pragma omp task shared(R)
+      { R = findIntervals(best, jr, im + 1, ir, D, costFunc, cmp, data); }
+#pragma omp taskwait
+    } else {
+      L = findIntervals(jl, best, il, im - 1, D, costFunc, cmp, data);
+      R = findIntervals(best, jr, im + 1, ir, D, costFunc, cmp, data);
+    }
+
     result.insert(result.end(), L.begin(), L.end());
     result.push_back({im, im, best});
     result.insert(result.end(), R.begin(), R.end());

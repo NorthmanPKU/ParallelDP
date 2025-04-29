@@ -1,8 +1,28 @@
 #include <iostream>
+#include <chrono>
 #include <vector>
 #include <algorithm>
 #include <climits>
 #include "glws.h"
+
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+
+std::vector<long double> generateStrictlyIncreasingArray(int n) {
+    std::vector<long double> arr;
+    arr.reserve(n);
+
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+    int current = std::rand() % 10;
+    for (int i = 0; i < n; ++i) {
+        current += 1 + (std::rand() % 5);
+        arr.push_back(current);
+    }
+
+    return arr;
+}
 
 
 void checkTest(const std::string &testName, long long expected, long long got) {
@@ -56,19 +76,19 @@ long double refSol(const std::vector<long double>& input, long double buildCost)
     }
     std::reverse(segments.begin(), segments.end());
 
-    std::cout << "Total cost: " << E[n] << '\n';
-    std::cout << "Used " << segments.size() << " segments\n";
-    for (const auto& [l, r] : segments) {
-        std::cout << "  Segment [" << l << ", " << r << "]: ";
-        for (size_t i = l; i <= r; ++i) std::cout << x[i - 1] << " ";
-        std::cout << '\n';
-    }
+    // std::cout << "Total cost: " << E[n] << '\n';
+    // std::cout << "Used " << segments.size() << " segments\n";
+    // for (const auto& [l, r] : segments) {
+    //     std::cout << "  Segment [" << l << ", " << r << "]: ";
+    //     for (size_t i = l; i <= r; ++i) std::cout << x[i - 1] << " ";
+    //     std::cout << '\n';
+    // }
 
     return E[n];
 }
 
 int main() {
-    std::vector<long double> pos = {1, 2, 3, 7, 8, 9, 10};
+    auto pos = generateStrictlyIncreasingArray(1000);
     int buildCost = 10;
 
     auto costFunc = [&](int j, int i, const std::vector<long double>& pos) -> long double {  // [j+1, i]
@@ -83,11 +103,10 @@ int main() {
         return cost + buildCost;
     };
 
-    // auto efunc = [](long double d, int j) { return d; };
-
     ConvexGLWS<long double> glws;
     long double result = glws.compute(pos, costFunc);
-    checkTest("GLWS Test", refSol(pos, buildCost), result);
+    long double expected = refSol(pos, buildCost);
+    checkTest("GLWS Test", expected, result);
     
     return 0;
 }
