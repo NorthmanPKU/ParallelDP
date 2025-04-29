@@ -111,8 +111,6 @@ auto MakeData(size_t n, size_t m, size_t k) {
   return arrows;
 }
 
-
-
 auto MakeParlayData(size_t n, size_t m, size_t k) {
   assert(k <= m);
   assert(k <= n);
@@ -120,7 +118,7 @@ auto MakeParlayData(size_t n, size_t m, size_t k) {
   parlay::sequence<parlay::sequence<size_t>> arrows(n + 1);
   parlay::parallel_for(1, k + 1, [&](size_t i) { arrows[i].push_back(i); });
   m -= k;
-  auto Push = [&](size_t i, const auto& s) {
+  auto Push = [&](size_t i, const auto &s) {
     if (m >= s.size()) {
       arrows[i].append(s);
       m -= s.size();
@@ -145,10 +143,11 @@ auto MakeParlayData(size_t n, size_t m, size_t k) {
       Push(i, parlay::make_slice(a.begin() + i + 1, a.end()));
     }
   }
-  size_t tot = parlay::reduce(
-      parlay::delayed_seq<size_t>(n + 1, [&](size_t i) -> size_t {
-        if (i > 0) return arrows[i].size();
-        else return 0;
-      }));
+  size_t tot = parlay::reduce(parlay::delayed_seq<size_t>(n + 1, [&](size_t i) -> size_t {
+    if (i > 0)
+      return arrows[i].size();
+    else
+      return 0;
+  }));
   return arrows;
 }

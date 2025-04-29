@@ -5,13 +5,12 @@
 #include "lis.h"
 #include "segment_tree.h"
 #include "segment_tree_cilk.h"
-#include <chrono>
 
 #include "parlay/internal/group_by.h"
 #include "parlay/parallel.h"
 #include "parlay/primitives.h"
-#include "utils.h"
 #include "segment_tree_cilk_opt.h"
+#include "utils.h"
 
 template <typename Left, typename Right>
 void conditional_par_do(bool parallel, Left left, Right right) {
@@ -30,11 +29,11 @@ void conditional_par_do(bool parallel, Left left, Right right) {
 // supporting any data type T and user-defined comparison functions.
 template <typename T, typename Compare = std::less<T>>
 class LCS {
-  private:
-    std::unique_ptr<Tree<int>> tree;
-    std::unique_ptr<SegmentTreeCilkOpt<size_t>> tree_opt;
- public:
+ private:
+  std::unique_ptr<Tree<int>> tree;
+  std::unique_ptr<SegmentTreeCilkOpt<size_t>> tree_opt;
 
+ public:
   /**
    * @brief Conver lcs to lis to compute
    */
@@ -80,7 +79,8 @@ class LCS {
                           parallel, granularity);
   }
 
-  int compute_arrows(std::vector<std::vector<int>> &arrows, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
+  int compute_arrows(std::vector<std::vector<int>> &arrows, ParallelArch arch = ParallelArch::CILK,
+                     bool parallel = false, int granularity = 0) {
     auto start = std::chrono::high_resolution_clock::now();
     if (arch == ParallelArch::CILK) {
       tree = std::make_unique<SegmentTreeCilk<int>>(arrows, std::numeric_limits<int>::max(), parallel, granularity);
@@ -90,20 +90,23 @@ class LCS {
       throw std::invalid_argument("Invalid parallel architecture");
     }
     auto end = std::chrono::high_resolution_clock::now();
-    // std::cout << ", Tree building time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    
+    // std::cout << ", Tree building time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end -
+    // start).count();
+
     int round = 0;
     while (tree->global_min() < std::numeric_limits<int>::max()) {
       round++;
       tree->prefix_min();
     }
     auto end2 = std::chrono::high_resolution_clock::now();
-    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count() << "ms" << std::endl;
+    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count() << "ms"
+              << std::endl;
 
     return round;
   }
 
-  int compute_arrows_paralay(size_t n, const parlay::sequence<parlay::sequence<size_t>>& arrows, bool ifparallel=false, int granularity=5000) {
+  int compute_arrows_paralay(size_t n, const parlay::sequence<parlay::sequence<size_t>> &arrows,
+                             bool ifparallel = false, int granularity = 5000) {
     const size_t inf = std::numeric_limits<size_t>::max();
     parlay::sequence<size_t> now(n + 1);
 
@@ -114,52 +117,47 @@ class LCS {
 
     parlay::sequence<size_t> tree(4 * n);
 
-    std::function<void(size_t, size_t, size_t)> Construct =
-      [&](size_t x, size_t l, size_t r) {
-        if (l == r) {
-          tree[x] = Read(l);
-          return;
-        }
-        size_t mid = (l + r) / 2;
-        bool parallel = ifparallel && r - l > granularity;
-        conditional_par_do(
-            parallel, [&]() { Construct(lc(x), l, mid); },
-            [&]() { Construct(rc(x), mid + 1, r); });
-        tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
-      };
+    std::function<void(size_t, size_t, size_t)> Construct = [&](size_t x, size_t l, size_t r) {
+      if (l == r) {
+        tree[x] = Read(l);
+        return;
+      }
+      size_t mid = (l + r) / 2;
+      bool parallel = ifparallel && r - l > granularity;
+      conditional_par_do(
+          parallel, [&]() { Construct(lc(x), l, mid); }, [&]() { Construct(rc(x), mid + 1, r); });
+      tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
+    };
 
-      std::function<void(size_t, size_t, size_t, size_t)> PrefixMin =
-      [&](size_t x, size_t l, size_t r, size_t pre) {
-        if (tree[x] > pre) return;
-        if (l == r) {
-          auto& ys = arrows[l];
-          if (now[l] + 8 >= ys.size() || ys[now[l] + 8] > pre) {
-            while (now[l] < ys.size() && ys[now[l]] <= pre) {
-              now[l]++;
-            }
-          } else {
-            now[l] = std::upper_bound(ys.begin() + now[l], ys.end(), pre) -
-                     ys.begin();
-          }
-          tree[x] = Read(l);
-          return;
-        }
-        size_t mid = (l + r) / 2;
-        if (tree[x] == tree[rc(x)]) {
-          if (tree[lc(x)] <= pre && tree[lc(x)] < inf) {
-            bool parallel = ifparallel && r - l > granularity;
-            size_t lc_val = tree[lc(x)];
-            conditional_par_do(
-                parallel, [&]() { PrefixMin(lc(x), l, mid, pre); },
-                [&]() { PrefixMin(rc(x), mid + 1, r, lc_val); });
-          } else {
-            PrefixMin(rc(x), mid + 1, r, pre);
+    std::function<void(size_t, size_t, size_t, size_t)> PrefixMin = [&](size_t x, size_t l, size_t r, size_t pre) {
+      if (tree[x] > pre) return;
+      if (l == r) {
+        auto &ys = arrows[l];
+        if (now[l] + 8 >= ys.size() || ys[now[l] + 8] > pre) {
+          while (now[l] < ys.size() && ys[now[l]] <= pre) {
+            now[l]++;
           }
         } else {
-          PrefixMin(lc(x), l, mid, pre);
+          now[l] = std::upper_bound(ys.begin() + now[l], ys.end(), pre) - ys.begin();
         }
-        tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
-      };
+        tree[x] = Read(l);
+        return;
+      }
+      size_t mid = (l + r) / 2;
+      if (tree[x] == tree[rc(x)]) {
+        if (tree[lc(x)] <= pre && tree[lc(x)] < inf) {
+          bool parallel = ifparallel && r - l > granularity;
+          size_t lc_val = tree[lc(x)];
+          conditional_par_do(
+              parallel, [&]() { PrefixMin(lc(x), l, mid, pre); }, [&]() { PrefixMin(rc(x), mid + 1, r, lc_val); });
+        } else {
+          PrefixMin(rc(x), mid + 1, r, pre);
+        }
+      } else {
+        PrefixMin(lc(x), l, mid, pre);
+      }
+      tree[x] = std::min(tree[lc(x)], tree[rc(x)]);
+    };
 
     Construct(1, 1, n);
     size_t round = 0;
@@ -169,13 +167,16 @@ class LCS {
       PrefixMin(1, 1, n, inf);
     }
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
+              << std::endl;
     return round;
   }
 
-  int compute_arrows_opt(const parlay::sequence<parlay::sequence<size_t>>& arrows, bool ifparallel=false, int granularity=5000) {
+  int compute_arrows_opt(const parlay::sequence<parlay::sequence<size_t>> &arrows, bool ifparallel = false,
+                         int granularity = 5000) {
     auto start = std::chrono::high_resolution_clock::now();
-    tree_opt = std::make_unique<SegmentTreeCilkOpt<size_t>>(arrows, std::numeric_limits<size_t>::max(), ifparallel, granularity);
+    tree_opt = std::make_unique<SegmentTreeCilkOpt<size_t>>(arrows, std::numeric_limits<size_t>::max(), ifparallel,
+                                                            granularity);
     auto end = std::chrono::high_resolution_clock::now();
     std::cout << "Prepare time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
               << std::endl;
@@ -186,13 +187,15 @@ class LCS {
       tree_opt->prefix_min();
     }
     auto end2 = std::chrono::high_resolution_clock::now();
-    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count() << "ms" << std::endl;
+    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - end).count() << "ms"
+              << std::endl;
 
     return round;
   }
 
   // without using arrows
-  int compute(const std::vector<T> &data1, const std::vector<T> &data2, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
+  int compute(const std::vector<T> &data1, const std::vector<T> &data2, ParallelArch arch = ParallelArch::CILK,
+              bool parallel = false, int granularity = 0) {
     auto start = std::chrono::high_resolution_clock::now();
     int n = data1.size(), m = data2.size();
     if (n == 0 || m == 0) return 0;
@@ -221,7 +224,9 @@ class LCS {
     return compute_arrows(arrows, arch, parallel, granularity);
   }
 
-  int compute(const std::string &data1, const std::string &data2, ParallelArch arch=ParallelArch::CILK, bool parallel=false, int granularity=0) {
-    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), arch, parallel, granularity);
+  int compute(const std::string &data1, const std::string &data2, ParallelArch arch = ParallelArch::CILK,
+              bool parallel = false, int granularity = 0) {
+    return compute(std::vector<T>(data1.begin(), data1.end()), std::vector<T>(data2.begin(), data2.end()), arch,
+                   parallel, granularity);
   }
 };

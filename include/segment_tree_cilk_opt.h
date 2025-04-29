@@ -3,6 +3,7 @@
 #include <cilk/cilk.h>
 #include <cilk/cilk_api.h>
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <functional>
 #include <iostream>
@@ -11,12 +12,11 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <atomic>
 
+#include "parlay/parallel.h"
+#include "parlay/sequence.h"
 #include "tree.h"
 #include "utils.h"
-#include "parlay/sequence.h"
-#include "parlay/parallel.h"
 
 /**
  * @brief A comprehensive segment tree implementation supporting both sequential and parallel builds.
@@ -191,10 +191,8 @@ class SegmentTreeCilkOpt : public Tree<T> {
         if (do_parallel) {
           // cilk_spawn prefix_min_recursive(lc(x), l, mid, pre);
           // prefix_min_recursive(rc(x), mid + 1, r, lc_val);
-          parlay::parallel_do(
-            [&]() { prefix_min_recursive(lc(x), l, mid, pre); },
-            [&]() { prefix_min_recursive(rc(x), mid + 1, r, lc_val); }
-          );
+          parlay::parallel_do([&]() { prefix_min_recursive(lc(x), l, mid, pre); },
+                              [&]() { prefix_min_recursive(rc(x), mid + 1, r, lc_val); });
           // cilk_sync;
         } else {
           prefix_min_recursive(lc(x), l, mid, pre);
@@ -212,9 +210,14 @@ class SegmentTreeCilkOpt : public Tree<T> {
   }
 
  public:
-  SegmentTreeCilkOpt(parlay::sequence<parlay::sequence<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
-              size_t _granularity = 1000)
-      : n(_arrows.size()), infinity(inf_value), arrows(_arrows), prefix_mode(true), granularity(_granularity), parallel(_parallel) {
+  SegmentTreeCilkOpt(parlay::sequence<parlay::sequence<T>> _arrows, T inf_value = std::numeric_limits<T>::max(),
+                     bool _parallel = false, size_t _granularity = 1000)
+      : n(_arrows.size()),
+        infinity(inf_value),
+        arrows(_arrows),
+        prefix_mode(true),
+        granularity(_granularity),
+        parallel(_parallel) {
     std::cout << "SegmentTreeCilkOpt init" << std::endl;
     std::cout << "inf_value: " << inf_value << std::endl;
     std::cout << "parallel: " << parallel << std::endl;
@@ -334,10 +337,7 @@ class SegmentTreeCilkOpt : public Tree<T> {
   /**
    * Return the current global minimum value in the tree
    */
-  T global_min() override {
-    return tree[0];
-  }
-
+  T global_min() override { return tree[0]; }
 
   /**
    * @brief Query the minimum value in a range
@@ -375,22 +375,22 @@ class SegmentTreeCilkOpt : public Tree<T> {
     size_t node_idx = 0;
     size_t left = 0;
     size_t right = n - 1;
-    
+
     while (left < right) {
-        size_t mid = (left + right) / 2;
-        
-        T left_min = tree[lc(node_idx)];
-        T right_min = tree[rc(node_idx)];
-        
-        if (left_min <= right_min) {
-            node_idx = lc(node_idx);
-            right = mid;
-        } else {
-            node_idx = rc(node_idx);
-            left = mid + 1;
-        }
+      size_t mid = (left + right) / 2;
+
+      T left_min = tree[lc(node_idx)];
+      T right_min = tree[rc(node_idx)];
+
+      if (left_min <= right_min) {
+        node_idx = lc(node_idx);
+        right = mid;
+      } else {
+        node_idx = rc(node_idx);
+        left = mid + 1;
+      }
     }
-    
+
     return left;
   }
 

@@ -11,7 +11,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include <atomic>
 
 #include "tree.h"
 #include "utils.h"
@@ -239,7 +238,7 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @param inf_value The value to use as infinity (default: maximum value of type T)
    */
   SegmentTreeOpenMP(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
-              size_t granularity = 1000)
+                    size_t granularity = 1000)
       : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
     std::cout << "SegmentTree init" << std::endl;
     // std::cout << "arr: " << std::endl;
@@ -269,8 +268,8 @@ class SegmentTreeOpenMP : public Tree<T> {
    * @param parallel Whether to build the tree in parallel
    * @param granularity The minimum size of a subtree to process in parallel
    */
-  SegmentTreeOpenMP(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(), bool _parallel = false,
-              size_t _granularity = 1000)
+  SegmentTreeOpenMP(std::vector<std::vector<T>> _arrows, T inf_value = std::numeric_limits<T>::max(),
+                    bool _parallel = false, size_t _granularity = 1000)
       : n(_arrows.size()),
         infinity(inf_value),
         arrows(_arrows),
@@ -393,9 +392,7 @@ class SegmentTreeOpenMP : public Tree<T> {
   /**
    * Return the current global minimum value in the tree
    */
-  T global_min() override {
-    return tree[0];
-  }
+  T global_min() override { return tree[0]; }
 
   /**
    * @brief Get the raw tree array

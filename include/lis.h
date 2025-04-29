@@ -17,8 +17,9 @@
 // supporting any data type T and user-defined comparison functions.
 template <typename T, typename Compare = std::less<T>>
 class LIS {
-  private:
-    std::unique_ptr<Tree<int>> tree;
+ private:
+  std::unique_ptr<Tree<int>> tree;
+
  public:
   // The parameter cmp is a comparison function, defaulting to std::less<T>
   int compute(const std::vector<T> &data, bool parallel = false, int granularity = 0, Compare cmp = Compare(),

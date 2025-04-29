@@ -8,20 +8,13 @@
 #include <vector>
 
 // enum including CILK and OpenMP
-enum class ParallelArch {
-  CILK,
-  OPENMP,
-  PARLAY,
-  CILK_OPT,
-  NONE
-};
+enum class ParallelArch { CILK, OPENMP, PARLAY, CILK_OPT, NONE };
 
 template <typename T1, typename T2>
 std::ostream &operator<<(std::ostream &os, const std::pair<T1, T2> &p) {
   os << "(" << p.first << "," << p.second << ")";
   return os;
 }
-
 
 // Used to store compressed information of the best decisions: indicates that for all states within the interval [l, r],
 // their
@@ -156,7 +149,6 @@ void generateLCS(int length1, int length2, int lcsLength, std::vector<std::vecto
   for (int i = 0; i < lcsLength; i++) {
     lcsValues[i] = (i + 1) * 100;
   }
-
 
   std::vector<int> pos1, pos2;
 
