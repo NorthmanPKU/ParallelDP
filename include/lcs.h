@@ -107,6 +107,8 @@ class LCS {
 
   int compute_arrows_paralay(size_t n, const parlay::sequence<parlay::sequence<size_t>> &arrows,
                              bool ifparallel = false, int granularity = 5000) {
+
+    // Learn from code of original paper Parallel-Work-Efficient-Dynamic-Programming
     const size_t inf = std::numeric_limits<size_t>::max();
     parlay::sequence<size_t> now(n + 1);
 
