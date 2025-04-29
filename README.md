@@ -1,4 +1,11 @@
 # ParallelDP
+
+[Project Proposal](./Final_Project_Proposal.pdf)
+
+[Milestone Report](./Milestone_Report.pdf)
+
+[Final Report](./Final_Report.pdf)
+
 ## Quick start
 
 Firstly run:
