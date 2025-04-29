@@ -88,7 +88,7 @@ int main(int argc, char* argv[]) {
     int m = 1000000;
     int k = 10;
     int granularity = 5000;
-    ParallelArch parallelArch = ParallelArch::CILK;
+    ParallelArch parallelArch = ParallelArch::PARLAY;
     bool test_random = false;
     bool parallel = true;
 
