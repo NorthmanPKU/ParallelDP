@@ -215,11 +215,11 @@ class SegmentTreeCilk : public Tree<T> {
   SegmentTreeCilk(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
                   size_t granularity = 1000)
       : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
-    std::cout << "SegmentTree init" << std::endl;
-    std::cout << std::endl;
-    std::cout << "inf_value: " << inf_value << std::endl;
-    std::cout << "parallel: " << parallel << std::endl;
-    std::cout << "granularity: " << granularity << std::endl;
+    // std::cout << "SegmentTree init" << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "inf_value: " << inf_value << std::endl;
+    // std::cout << "parallel: " << parallel << std::endl;
+    // std::cout << "granularity: " << granularity << std::endl;
     if (arr.empty()) {
       throw std::invalid_argument("Input array cannot be empty");
     }
@@ -248,10 +248,10 @@ class SegmentTreeCilk : public Tree<T> {
         prefix_mode(true),
         granularity(_granularity),
         parallel(_parallel) {
-    std::cout << "SegmentTree Prefix mode init" << std::endl;
-    std::cout << "inf_value: " << inf_value << std::endl;
-    std::cout << "parallel: " << parallel << std::endl;
-    std::cout << "granularity: " << granularity << std::endl;
+    // std::cout << "SegmentTree Prefix mode init" << std::endl;
+    // std::cout << "inf_value: " << inf_value << std::endl;
+    // std::cout << "parallel: " << parallel << std::endl;
+    // std::cout << "granularity: " << granularity << std::endl;
     if constexpr (std::is_same_v<T, std::string>) {
       // TODO: A current workaround for string comparison
       infinity = "zzzzzzzzzzzzzzzzzzzz";

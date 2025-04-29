@@ -167,8 +167,8 @@ class LCS {
       PrefixMin(1, 1, n, inf);
     }
     auto end = std::chrono::high_resolution_clock::now();
-    std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
-              << std::endl;
+    // std::cout << "LCS time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms"
+    //           << std::endl;
     return round;
   }
 

@@ -240,15 +240,15 @@ class SegmentTreeOpenMP : public Tree<T> {
   SegmentTreeOpenMP(const std::vector<T> &arr, T inf_value = std::numeric_limits<T>::max(), bool parallel = false,
                     size_t granularity = 1000)
       : n(arr.size()), infinity(inf_value), prefix_mode(false), granularity(granularity), parallel(parallel) {
-    std::cout << "SegmentTree init" << std::endl;
+    // std::cout << "SegmentTree init" << std::endl;
     // std::cout << "arr: " << std::endl;
     // for (size_t i = 0; i < arr.size(); ++i) {
     //   std::cout << arr[i] << " ";
     // }
-    std::cout << std::endl;
-    std::cout << "inf_value: " << inf_value << std::endl;
-    std::cout << "parallel: " << parallel << std::endl;
-    std::cout << "granularity: " << granularity << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "inf_value: " << inf_value << std::endl;
+    // std::cout << "parallel: " << parallel << std::endl;
+    // std::cout << "granularity: " << granularity << std::endl;
     if (arr.empty()) {
       throw std::invalid_argument("Input array cannot be empty");
     }

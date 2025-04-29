@@ -2,10 +2,21 @@
 #include <iostream>
 #include <vector>
 
+using namespace dp_dsl;
+
+void detectProblemType(DPProblem<int> &problem) {
+    ProblemType type = problem.getProblemType();
+    std::cout << "Detected problem type: " << 
+        (type == ProblemType::LIS ? "LIS" : 
+         type == ProblemType::LCS ? "LCS" : 
+         type == ProblemType::CONVEX_GLWS ? "Convex GLWS" : "Unknown") 
+        << std::endl;
+}
+
 int main() {
-    using namespace dp_dsl;
     
     // Example 1: Defining LIS problem using builder pattern
+    std::cout << "Example 1: LIS" << std::endl;
     auto Seq = new Sequence<int>({3, 1, 4, 2, 7, 5, 8, 6, 9, 10});
     auto I = new IndVar(0, 10);
     auto J = new RangeDepVar(0, I-1);
@@ -16,15 +27,13 @@ int main() {
         .withCondition(dp_dsl::max(Status(J) + 1, Status(I)))
         .build();
     // Let the system recognize the problem type
-    ProblemType type = problem1.getProblemType();
-    std::cout << "Detected problem type: " << 
-        (type == ProblemType::LIS ? "LIS" : 
-         type == ProblemType::LCS ? "LCS" : 
-         type == ProblemType::CONVEX_GLWS ? "Convex GLWS" : "Unknown") 
-        << std::endl;
-    
+    detectProblemType(problem1);
+    auto ans = problem1.solve();
+    std::cout << "Answer: " << ans << std::endl;
 
     // Example 2: Defining LCS problem using builder pattern
+    std::cout << "--------------------------------" << std::endl;
+    std::cout << "Example 2: LCS" << std::endl;
     auto Seq1 = new Sequence<int>({1, 2, 3, 4, 5});
     auto Seq2 = new Sequence<int>({3, 1, 4, 2, 5});
     auto I2 = new IndVar(0, 5);
@@ -41,29 +50,9 @@ int main() {
         .build();
     
     // Let the system recognize the problem type
-    ProblemType type2 = problem2.getProblemType();
-    std::cout << "Detected problem type: " << 
-        (type2 == ProblemType::LIS ? "LIS" : 
-         type2 == ProblemType::LCS ? "LCS" : 
-         type2 == ProblemType::CONVEX_GLWS ? "Convex GLWS" : "Unknown") 
-        << std::endl;
-
-    
-    // // Example 3: Manual problem definition for Convex GLWS
-    // auto glws_problem = ProblemBuilder<long double>::create()
-    //     .withVar("i", 0, 20)
-    //     .withVar("j", 0, 20)
-    //     .withObjective(Objective::MINIMIZE)
-    //     .withConstraint("i", "j", Constraint::ConstraintType::LESS_THAN)
-    //     .withSequence("data", std::vector<long double>{1.0, 2.5, 3.0, 4.2, 5.1, 6.3})
-    //     .withValue("buildCost", 10.0)
-    //     .withRecurrence([](const std::map<std::string, int>& state) {
-    //         // Recurrence relation for convex GLWS
-    //         // dp[i][j] = min(dp[i][k] + cost(k, j)) for all k in [i, j)
-    //     })
-    //     .build();
-    
-    // double glws_result = SolverDispatcher::solve<long double>(glws_problem);
-    // std::cout << "Convex GLWS result: " << glws_result << std::endl;
+    detectProblemType(problem2);
+    auto ans2 = problem2.solve();
+    std::cout << "Answer: " << ans2 << std::endl;
+    std::cout << "--------------------------------" << std::endl;
     return 0;
 }

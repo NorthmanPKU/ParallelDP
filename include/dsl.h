@@ -29,6 +29,16 @@ struct Var {
   VarType type;
   Var(VarType t) : type(t) {}
 
+  std::string name() const {
+    switch (type) {
+      case VarType::IND:
+        return "IndVar";
+      case VarType::SINGLE_DEP:
+        return "SingleDepVar";
+      case VarType::RANGE_DEP:
+        return "RangeDepVar";
+    }
+  }
   virtual ~Var() = default;
 };
 
@@ -108,8 +118,20 @@ struct Constraint {
 
   Constraint(Val<T> v1, Val<T> v2, ConstraintType t) : val1(v1), val2(v2), type(t) {}
 
-  // Constraint()
-  //     : val1(nullptr), val2(nullptr), type(ConstraintType::NONE) {}
+  std::string name() const {
+    switch (type) {
+      case ConstraintType::LESS_THAN:
+        return "LessThan";
+      case ConstraintType::GREATER_THAN:
+        return "GreaterThan";
+      case ConstraintType::EQUAL:
+        return "Equal";
+      case ConstraintType::NOT_EQUAL:
+        return "NotEqual";
+      default:
+        return "None";
+    }
+  }
   Constraint() : val1(Val<T>(nullptr, nullptr)), val2(Val<T>(nullptr, nullptr)), type(ConstraintType::NONE) {}
 };
 
@@ -152,6 +174,21 @@ struct Expression {
 
   Expression(ExpressionType t) : type(t) {}
   Expression() : type(ExpressionType::NONE) {}
+
+  std::string name() const {
+    switch (type) {
+      case ExpressionType::MAX:
+        return "Max";
+      case ExpressionType::MIN:
+        return "Min";
+      case ExpressionType::NUMBER:
+        return "Number";
+      case ExpressionType::STATUS:
+        return "Status";
+      default:
+        return "None";
+    }
+  }
 };
 
 struct TwoPartExpression : Expression {
@@ -195,6 +232,8 @@ TwoPartExpression max(Expression s1, Expression s2) {
   return res;
 }
 
+class SolverDispatcher;
+
 // Data input representation
 // Base class for defining DP problems
 template <typename U>
@@ -207,13 +246,13 @@ class DPProblem {
     if (v->type == Var::VarType::IND) {
       status_dim++;
       state_variables.emplace_back(dynamic_cast<IndVar *>(v));
-      std::cout << "Independent variable added" << std::endl;
+      // std::cout << "Independent variable added" << std::endl;
     } else if (v->type == Var::VarType::SINGLE_DEP) {
       single_dep_variables.emplace_back(dynamic_cast<SingleDepVar *>(v));
-      std::cout << "Single dependency variable added" << std::endl;
+      // std::cout << "Single dependency variable added" << std::endl;
     } else if (v->type == Var::VarType::RANGE_DEP) {
       range_dep_variables.emplace_back(dynamic_cast<RangeDepVar *>(v));
-      std::cout << "Range dependency variable added" << std::endl;
+      // std::cout << "Range dependency variable added" << std::endl;
     }
   }
 
@@ -242,12 +281,9 @@ class DPProblem {
   }
 
   template <typename T>
-  const std::vector<T> &getSequence(const std::string &name) const {
-    auto it = data_map.find(name);
-    if (it == data_map.end()) {
-      throw std::runtime_error("Sequence not found: " + name);
-    }
-    return std::get<std::vector<T>>(it->second);
+  const std::vector<T> &getSequence(int idx) const {
+    // return std::get<std::vector<T>>(sequences[idx]->data);
+    return sequences[idx]->data;
   }
 
   template <typename T>
@@ -263,19 +299,73 @@ class DPProblem {
 
   // Problem recognition
   ProblemType getProblemType() const {
+    // std::cout << "state_variables.size(): " << state_variables.size() << std::endl;
+    // std::cout << "state_variables[0]->type: " << state_variables[0]->name() << std::endl;
+    // std::cout << "sequences.size(): " << sequences.size() << std::endl;
+    // std::cout << "conditions.size(): " << conditions.size() << std::endl;
+    // std::cout << "conditions[0].first.name(): " << conditions[0].first.name() << std::endl;
+    // std::cout << "conditions[0].second.name(): " << conditions[0].second.name() << std::endl;
     // LIS recognition pattern
     if (state_variables.size() == 1 && state_variables[0]->type == Var::VarType::IND &&
         range_dep_variables.size() == 1 && range_dep_variables[0]->range_type == RangeDepVar::RangeType::LIRV &&
-        sequences.size() == 1 && conditions.size() == 1 && conditions[0].first.type == ConstraintType::LESS_THAN &&
-        conditions[0].second.type == ExpressionType::STATUS) {
+        sequences.size() == 1 && conditions.size() == 1 && conditions[0].first.type == ConstraintType::NONE &&
+        conditions[0].second.type == ExpressionType::MAX) {
       return ProblemType::LIS;
-    } else if (state_variables.size() == 2) {
+    } else if (state_variables.size() == 2 && state_variables[0]->type == Var::VarType::IND && sequences.size() == 2 &&
+               conditions.size() == 2 && conditions[0].first.type == ConstraintType::EQUAL &&
+               conditions[0].second.type == ExpressionType::STATUS) {
       return ProblemType::LCS;
     }
 
     // Scale with more problem patterns here
 
     return ProblemType::UNKNOWN;
+  }
+
+  U solve() {
+    ProblemType type = getProblemType();
+    switch (type) {
+      case ProblemType::LIS:
+        return solveLIS<U>();
+      case ProblemType::LCS:
+        return solveLCS<U>();
+      default:
+        throw std::runtime_error("Cannot solve problem: unknown type");
+    }
+  }
+
+ private:
+  template <typename T>
+  T solveLIS() {
+    const auto &sequence = sequences[0]->data;
+
+    // Create backend solver
+    LIS<T> solver;
+    return solver.compute(sequence, true, 1000);
+  }
+
+  template <typename T>
+  T solveLCS() {
+    const auto &seq1 = sequences[0]->data;
+    const auto &seq2 = sequences[1]->data;
+
+    int n = seq1.size();
+    // std::cout << "n: " << n << std::endl;
+
+    parlay::sequence<parlay::sequence<size_t>> arrows(n);
+
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        if (seq1[i] == seq2[j]) {
+          arrows[i].push_back(j);
+        }
+      }
+    }
+
+    // Create backend solver
+    LCS<int> solver;
+    // return solver.compute(seq1, seq2);
+    return solver.compute_arrows_paralay(n, arrows);
   }
 
  protected:
@@ -324,12 +414,26 @@ class SolverDispatcher {
 
   template <typename T>
   static T solveLCS(DPProblem<T> &problem) {
-    const auto &seq1 = problem.template getSequence<T>("seq1");
-    const auto &seq2 = problem.template getSequence<T>("seq2");
+    const auto &seq1 = problem.template getSequence<T>(0);
+    const auto &seq2 = problem.template getSequence<T>(1);
+
+    int n = seq1.size();
+    // std::cout << "n: " << n << std::endl;
+
+    parlay::sequence<parlay::sequence<size_t>> arrows(n);
+
+    for (int i = 0; i < n; ++i) {
+      for (int j = 0; j < n; ++j) {
+        if (seq1[i] == seq2[j]) {
+          arrows[i].push_back(j);
+        }
+      }
+    }
 
     // Create backend solver
     LCS<int> solver;
-    return solver.compute(seq1, seq2);
+    // return solver.compute(seq1, seq2);
+    return solver.compute_arrows_paralay(n, arrows);
   }
 
   template <typename T>
