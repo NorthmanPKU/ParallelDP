@@ -1,4 +1,4 @@
-# ParallelDP
+# ParallelDP: A Generic DSL for Efficient Parallel Dynamic Programming
 
 [Project Proposal](./Final_Project_Proposal.pdf)
 
